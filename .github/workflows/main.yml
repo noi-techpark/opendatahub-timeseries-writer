@@ -109,7 +109,7 @@ jobs:
           X_SERVER_PORT: 1010
 
           # Database Configuration
-          X_POSTGRES_SERVER: "prod-pg-bdp.co90ybcr8iim.eu-west-1.rds.amazonaws.com"
+          X_POSTGRES_SERVER: "pg-timeseries.c7g4gkk0sl4i.eu-west-1.rds.amazonaws.com"
           X_POSTGRES_DB: "bdp"
           X_POSTGRES_PORT: "5432"
           X_POSTGRES_SCHEMA: "intimev2"
