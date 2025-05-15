@@ -55,7 +55,7 @@ jobs:
           echo "Releasing ${LAST_VERSION}-SNAPSHOT"
           ./infrastructure/utils/quickrelease.sh snapshot "$LAST_VERSION"
       - name: Set up Java
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
