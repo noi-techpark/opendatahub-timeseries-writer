@@ -22,6 +22,7 @@ env:
   HIBERNATE_LOG_LEVEL: WARN
   HIBERNATE_MAX_POOL_SIZE: 15
   HIKARI_LEAK_DETECTION_THRESHOLD: 20000
+  ACTUATOR_ENABLE_METRICS: "true"
 
 database:
   servicebindName: "postgres-readwrite-svcbind"
