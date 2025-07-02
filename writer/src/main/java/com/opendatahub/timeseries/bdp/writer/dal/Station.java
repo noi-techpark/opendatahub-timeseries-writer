@@ -412,10 +412,11 @@ public class Station {
 			}
 			em.getTransaction().commit();
 		} catch (Exception e) {
+			throw JPAException.unnest(e);
+		} finally {
 			if (em.getTransaction().isActive()) {
 				em.getTransaction().rollback();
 			}
-			throw JPAException.unnest(e);
 		}
 		if (syncState) {
 			String origin = data.get(0).getOrigin();
@@ -424,10 +425,11 @@ public class Station {
 				syncStationStates(em, stationType, origin, stationCodes, provenanceName, provenanceVersion, onlyActivation);
 				em.getTransaction().commit();
 			} catch (Exception e) {
+				throw JPAException.unnest(e);
+			} finally {
 				if (em.getTransaction().isActive()) {
 					em.getTransaction().rollback();
 				}
-				throw JPAException.unnest(e);
 			}
 		}
 	}

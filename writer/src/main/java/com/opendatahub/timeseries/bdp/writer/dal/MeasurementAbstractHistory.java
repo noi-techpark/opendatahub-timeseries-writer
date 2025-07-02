@@ -277,10 +277,11 @@ public abstract class MeasurementAbstractHistory implements Serializable {
                         log.error(
                                 String.format("Exception '%s'... Skipping this measurement!", ex.getMessage()),
                                 ex);
+                        LOG.debug("Printing stack trace", ex);
+                    } finally {
                         if (em.getTransaction().isActive()) {
                             em.getTransaction().rollback();
                         }
-                        LOG.debug("Printing stack trace", ex);
                     }
                 }
             }
@@ -291,10 +292,11 @@ public abstract class MeasurementAbstractHistory implements Serializable {
                         stationType, String.join(", ", skippedDataTypes)));
             }
         } catch (Exception e) {
-            if (em.getTransaction().isActive())
-                em.getTransaction().rollback();
             throw JPAException.unnest(e);
         } finally {
+            if (em.getTransaction().isActive()){
+                em.getTransaction().rollback();
+            }
             em.clear();
             if (em.isOpen())
                 em.close();
