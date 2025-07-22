@@ -66,7 +66,7 @@ used by the `writer` and `client` to exchange data in a standardized
 format.
 
 The **OUTBOUND** API is called
-[Ninja](https://github.com/noi-techpark/it.bz.opendatahub.api.mobility-ninja).
+[Ninja](https://github.com/noi-techpark/opendatahub-timeseries-api).
 
 The writer is a REST API, which takes JSON DTOs, deserializes and validates them
 and finally stores them in the database. Additionally, it sets stations to
