@@ -6,8 +6,8 @@ SPDX-License-Identifier: CC0-1.0
 
 # Big Data Platform
 
-[![REUSE Compliance](https://github.com/noi-techpark/bdp-core/actions/workflows/reuse.yml/badge.svg)](https://github.com/noi-techpark/odh-docs/wiki/REUSE#badges)
-[![CI](https://github.com/noi-techpark/bdp-core/actions/workflows/main.yml/badge.svg)](https://github.com/noi-techpark/bdp-core/actions/workflows/main.yml)
+[![REUSE Compliance](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/reuse.yml/badge.svg)](https://github.com/noi-techpark/opendatahub-docs/wiki/REUSE)
+[![CI](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml/badge.svg)](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml)
 
 The Big Data Platform is part of the [Open Data Hub](http://opendatahub.com/)
 project. It collects and exposes data sets of various domains.
@@ -420,7 +420,7 @@ Include the dependency `client` for data collectors:
 ```
 
 You can also use a version-range, like `[7.3.0,8.0.0)`. Find the latest version
-in our [release channel](https://github.com/noi-techpark/bdp-core/releases) on
+in our [release channel](https://github.com/noi-techpark/opendatahub-timeseries-writer/releases) on
 GitHub.
 
 ### I want to publish a new client sdk on our maven repository
@@ -478,10 +478,10 @@ Call `mvn --projects dto --projects client --also-make clean install deploy`
 ### I want to get started with a new data-collector
 
 Refer to the [Contributing chapter] and our [HelloWorld Example Data Collector] inside
-https://github.com/noi-techpark/bdp-commons to start a new data collector.
+https://github.com/noi-techpark/opendatahub-bdp-collectors to start a new data collector.
 
-[Contributing chapter]: https://github.com/noi-techpark/bdp-commons/blob/main/README.md#contributing
-[HelloWorld Example Project]: https://github.com/noi-techpark/bdp-commons/tree/main/data-collectors/helloworld
+[Contributing chapter]: https://github.com/noi-techpark/opendatahub-bdp-collectors/blob/main/README.md#contributing
+[HelloWorld Example Project]: https://github.com/noi-techpark/opendatahub-bdp-collectors/tree/main/data-collectors/helloworld
 
 ## Information
 
@@ -492,7 +492,7 @@ For support, please contact [help@opendatahub.com](mailto:help@opendatahub.com).
 ### Contributing
 
 If you'd like to contribute, please follow our [Getting
-Started](https://github.com/noi-techpark/odh-docs/wiki/Contributor-Guidelines:-Getting-started)
+Started](https://github.com/noi-techpark/opendatahub-docs/wiki/Contributor-Guidelines:-Getting-started)
 instructions.
 
 ### Documentation
@@ -507,7 +507,7 @@ Version 3 license. See the [LICENSE](LICENSE) file for more information.
 
 ### REUSE
 
-This project is [REUSE](https://reuse.software) compliant, more information about the usage of REUSE in NOI Techpark repositories can be found [here](https://github.com/noi-techpark/odh-docs/wiki/Guidelines-for-developers-and-licenses#guidelines-for-contributors-and-new-developers).
+This project is [REUSE](https://reuse.software) compliant, more information about the usage of REUSE in NOI Techpark repositories can be found [here](https://github.com/noi-techpark/opendatahub-docs/wiki/Guidelines-for-developers-and-licenses).
 
 Since the CI for this project checks for REUSE compliance you might find it useful to use a pre-commit hook checking for REUSE compliance locally. The [pre-commit-config](.pre-commit-config.yaml) file in the repository root is already configured to check for REUSE compliance with help of the [pre-commit](https://pre-commit.com) tool.
 
