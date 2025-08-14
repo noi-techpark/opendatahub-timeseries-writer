@@ -208,7 +208,7 @@ jobs:
           k8s-name: bdp-core
           k8s-namespace: core
           chart-path: infrastructure/helm/bdp-core
-          values-file: infrastructure/helm/test.yaml
+          values-file: infrastructure/helm/prod.yaml
           aws-access-key-id: ${{ secrets[vars.AWS_KEY_ID] }}
           aws-secret-access-key: ${{ secrets[vars.AWS_KEY_SECRET] }}
           aws-eks-cluster-name: aws-main-eu-01
