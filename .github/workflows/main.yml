@@ -91,84 +91,11 @@ jobs:
 
   # Deploy Prod
   deploy-prod:
-    runs-on: ubuntu-22.04
-    if: github.ref == 'refs/heads/prod'
-    needs: test
-    concurrency: deploy-prod
-    environment: prod
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v2
-      - name: Create .env file
-        uses: noi-techpark/github-actions/env-file@v2
-        env:
-          X_COMPOSE_PROJECT_NAME: ${{ env.PROJECT_NAME }}
-          X_DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
-          X_DOCKER_TAG: ${{ env.DOCKER_TAG }}
-          X_SERVER_PORT: 1010
-
-          # Database Configuration
-          X_POSTGRES_SERVER: "pg-timeseries.c7g4gkk0sl4i.eu-west-1.rds.amazonaws.com"
-          X_POSTGRES_DB: "bdp"
-          X_POSTGRES_PORT: "5432"
-          X_POSTGRES_SCHEMA: "intimev2"
-          X_POSTGRES_USERNAME: "bdp"
-          X_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
-          X_HIBERNATE_MAX_POOL_SIZE: "15"
-
-          # Security
-          X_SECURITY_ALLOWED_ORIGINS: "*"
-          X_KEYCLOAK_URL: "https://auth.opendatahub.com/auth"
-          X_KEYCLOAK_SSL_REQUIRED: "none"
-          X_KEYCLOAK_REALM: "noi"
-          X_KEYCLOAK_CLIENT_ID: "odh-mobility-writer"
-
-          # Logging
-          X_LOG_APPLICATION_NAME: "writer"
-          X_LOG_APPLICATION_VERSION: ${{ github.sha }}
-          X_LOG_STYLE: "json"
-          X_LOG_LEVEL: "info"
-          X_ROOT_LOG_LEVEL : "info"
-          X_HIBERNATE_LOG_LEVEL: "warn"
-          X_HIBERNATE_SQL_LOG: "false"
-
-      - name: Build project
-        uses: noi-techpark/github-actions/maven-build@v2
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          build-command: 'mvn -B -DskipTests -DfinalName=bdp --projects writer --also-make clean package'
-
-      - name: Build and push images
-        uses: noi-techpark/github-actions/docker-build-and-push@v2
-        with:
-          docker-username: ${{ github.actor }}
-          docker-password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Add a "latest" docker tag
-        uses: shrink/actions-docker-registry-tag@v2
-        with:
-          registry: ghcr.io
-          repository: ${{ github.repository }}/${{ github.event.repository.name }}-app
-          target: ${{ env.DOCKER_TAG }}
-          tags: |
-            latest
-
-      - name: Deploy application
-        uses: noi-techpark/github-actions/docker-deploy@v2
-        with:
-          hosts: 'prod'
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          docker-username: 'noi-techpark-bot'
-          docker-password: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          project-name: ${{ env.PROJECT_NAME }}
-
-  # Deploy Prod k8s
-  deploy-prod-k8s:
     runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/prod'
     needs: test
     environment: prod
-    concurrency: deploy-prod-k8s
+    concurrency: deploy-prod
     steps:
       - name: Checkout source code
         uses: actions/checkout@v2
