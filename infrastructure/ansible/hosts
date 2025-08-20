@@ -1,5 +1,0 @@
-[test]
-docker02.testingmachine.eu ansible_user='noi-techpark-bot' ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-
-[prod]
-docker02.opendatahub.com ansible_user='noi-techpark-bot' ansible_ssh_common_args='-o StrictHostKeyChecking=no'
