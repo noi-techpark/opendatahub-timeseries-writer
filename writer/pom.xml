@@ -177,7 +177,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>commons-beanutils</groupId>
 			<artifactId>commons-beanutils</artifactId>
-			<version>1.9.4</version>
+			<version>1.11.0</version>
 		</dependency>
 		<!-- StringSubstitutor: Replace env vars in .properties files -->
 		<dependency>
