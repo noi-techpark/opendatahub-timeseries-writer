@@ -42,6 +42,7 @@ services:
   # of cached databases...
   db:
     image: postgis/postgis:16-3.5-alpine
+    restart: no
     environment:
       POSTGRES_DB: bdp
       POSTGRES_USER: bdp
