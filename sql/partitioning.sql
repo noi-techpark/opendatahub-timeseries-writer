@@ -72,14 +72,60 @@ alter table measurementstringhistory drop column period;
 -- repack table. Replace with pg_repack to do it online when going to production
 vacuum full measurementstringhistory;
 
-select min(h.timestamp), max(h.timestamp)
-from station s
-join timeseries t on t.station_id  = s.id 
-join type p on p.id = t.type_id
-join measurementstringhistory h on h.timeseries_id = t.id 
-where t.value_table = 'measurementstring'
-and s.stationcode = '5389'
 
+-- DOUBLE history
+alter table measurementhistory add column
+timeseries_id int4;
+alter table measurementhistory add column
+partition_id int2 not null default 1;
+alter table measurementhistory add constraint fk_measurementhistory_timeseries foreign key (timeseries_id) references timeseries(id);
+alter table measurementhistory add constraint fk_measurementhistory_partition foreign key (partition_id) references "partition"(id);
+
+update measurementhistory h
+set timeseries_id = t.id, partition_id = 1
+from timeseries t
+where t.station_id = h.station_id 
+and t.type_id = h.type_id 
+and t.period = h."period" 
+and t.value_table = 'measurement';
+
+create index idx_measurementhistory_timeseries_ts on measurementhistory (timeseries_id, timestamp);
+alter table measurementhistory alter column timeseries_id set not null;
+
+alter table measurementhistory drop column id;
+alter table measurementhistory drop column station_id;
+alter table measurementhistory drop column type_id;
+alter table measurementhistory drop column period;
+
+-- repack table. Replace with pg_repack to do it online when going to production
+vacuum full measurementhistory;
+
+-- DOUBLE history
+alter table measurementjsonhistory add column
+timeseries_id int4;
+alter table measurementjsonhistory add column
+partition_id int2 not null default 1;
+alter table measurementjsonhistory add constraint fk_measurementjsonhistory_timeseries foreign key (timeseries_id) references timeseries(id);
+alter table measurementjsonhistory add constraint fk_measurementjsonhistory_partition foreign key (partition_id) references "partition"(id);
+
+update measurementjsonhistory h
+set timeseries_id = t.id, partition_id = 1
+from timeseries t
+where t.station_id = h.station_id 
+and t.type_id = h.type_id 
+and t.period = h."period" 
+and t.value_table = 'measurementjson';
+
+create index idx_measurementjsonhistory_timeseries_ts on measurementjsonhistory (timeseries_id, timestamp);
+alter table measurementjsonhistory alter column timeseries_id set not null;
+
+alter table measurementjsonhistory drop column id;
+alter table measurementjsonhistory drop column station_id;
+alter table measurementjsonhistory drop column type_id;
+alter table measurementjsonhistory drop column period;
+
+-- repack table. Replace with pg_repack to do it online when going to production
+vacuum full measurementjsonhistory;
 
 
 
