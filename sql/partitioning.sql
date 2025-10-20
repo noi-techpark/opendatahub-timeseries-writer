@@ -1,3 +1,7 @@
+-- SPDX-FileCopyrightText: 2025 NOI Techpark <digital@noi.bz.it>
+--
+-- SPDX-License-Identifier: CC0-1.0
+
 -- run as superuser in postgres db:
 create extension pg_repack;
 

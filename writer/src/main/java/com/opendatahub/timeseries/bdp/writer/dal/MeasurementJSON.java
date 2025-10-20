@@ -94,12 +94,12 @@ public class MeasurementJSON extends MeasurementAbstract {
 
 	@Override
 	public MeasurementAbstract findLatestEntry(EntityManager em, Station station, DataType type, Integer period) {
-		return MeasurementAbstract.findLatestEntryImpl(em, station, type, period, this);
+		return TimeSeries.findLatestEntryImpl(em, station, type, period, this);
 	}
 
 	@Override
 	public Date getDateOfLastRecord(EntityManager em, Station station, DataType type, Integer period) {
-		return MeasurementAbstract.getDateOfLastRecordImpl(em, station, type, period, this);
+		return TimeSeries.getDateOfLastRecordImpl(em, station, type, period, this);
 	}
 
 	@Override

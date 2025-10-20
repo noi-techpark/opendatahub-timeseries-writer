@@ -95,7 +95,7 @@ public class MeasurementHistory extends MeasurementAbstractHistory {
 
 	@Override
 	public List<RecordDto> findRecords(EntityManager em, String stationtype, String identifier, String cname, Date start, Date end, Integer period) {
-		return MeasurementAbstractHistory.findRecordsImpl(em, stationtype, identifier, cname, start, end, period, this);
+		return TimeSeries.findRecordsImpl(em, stationtype, identifier, cname, start, end, period, this);
 	}
 	@Override
 	public void setValue(Object value) {
