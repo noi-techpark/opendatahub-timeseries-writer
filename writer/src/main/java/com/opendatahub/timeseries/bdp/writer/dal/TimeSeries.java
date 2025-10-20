@@ -55,6 +55,7 @@ public class TimeSeries {
 	@SequenceGenerator(name = "timeseries_gen", sequenceName = "timeseries_seq", allocationSize = 1)
 	@ColumnDefault(value = "nextval('timeseries_seq')")
 	protected Long id;
+
 	@ManyToOne(cascade = CascadeType.ALL, optional = false)
 	private Station station;
 
@@ -66,6 +67,9 @@ public class TimeSeries {
 
 	@Column(nullable = false)
 	private String value_table;
+
+	@Column(nullable = false)
+	private Partition partition;
 
 	protected TimeSeries() {
 	}
@@ -477,7 +481,7 @@ public class TimeSeries {
 		List<RecordDto> dtos = new ArrayList<>();
 		for (MeasurementAbstractHistory m : result) {
 			SimpleRecordDto dto = new SimpleRecordDto(m.getTimestamp().getTime(), m.getValue(),
-					setPeriod ? m.getPeriod() : null);
+					setPeriod ? m.getTimeseries().getPeriod() : null);
 			dto.setCreated_on(m.getCreated_on().getTime());
 			dtos.add(dto);
 		}

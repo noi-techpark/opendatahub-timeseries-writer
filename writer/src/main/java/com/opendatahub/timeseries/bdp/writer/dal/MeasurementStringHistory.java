@@ -1,5 +1,5 @@
 // Copyright © 2018 IDM Südtirol - Alto Adige (info@idm-suedtirol.com)
-// Copyright © 2019 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
+// Copyright © 2019-2025 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -27,12 +27,12 @@ import jakarta.persistence.UniqueConstraint;
 	name = "measurementstringhistory",
 	indexes = {
 		@Index(
-			columnList = "station_id, type_id, timestamp DESC, period"
+			columnList = "timeseries_id, timestamp"
 		)
 	},
 	uniqueConstraints = {
 		@UniqueConstraint(
-			columnNames = {"station_id", "type_id", "timestamp", "period", "string_value"}
+			columnNames = {"timeseries_id", "timestamp"}
 		)
 	}
 )
@@ -62,18 +62,9 @@ public class MeasurementStringHistory extends MeasurementAbstractHistory {
 		super();
 	}
 
-	/**
-	 * @param station entity associated with this measurement
-	 * @param type entity associated with this measurement
-	 * @param value string value for this measurement
-	 * @param timestamp UTC time of measurement detection
-	 * @param period standard interval between 2 measurements
-	 */
-	public MeasurementStringHistory(Station station, DataType type, String value, Date timestamp, Integer period) {
-		setStation(station);
-		setType(type);
+	public MeasurementStringHistory(TimeSeries timeseries, String value, Date timestamp) {
 		setTimestamp(timestamp);
-		setPeriod(period);
+		setTimeseries(timeseries);
 		setValue(value);
 	}
 

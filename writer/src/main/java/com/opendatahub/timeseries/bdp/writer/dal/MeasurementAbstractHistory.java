@@ -1,5 +1,5 @@
 // Copyright © 2018 IDM Südtirol - Alto Adige (info@idm-suedtirol.com)
-// Copyright © 2019 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
+// Copyright © 2019-2025 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -30,6 +30,7 @@ import jakarta.persistence.MappedSuperclass;
  *
  * @author Peter Moser
  * @author Patrick Bertolla
+ * @author Clemens Zagler
  */
 @MappedSuperclass
 public abstract class MeasurementAbstractHistory implements Serializable {
@@ -42,17 +43,14 @@ public abstract class MeasurementAbstractHistory implements Serializable {
     @Column(nullable = false)
     private Date timestamp;
 
-    @ManyToOne(optional = false)
-    private Station station;
-
-    @ManyToOne(optional = false, cascade = CascadeType.PERSIST)
-    private DataType type;
-
-    @Column(nullable = false)
-    private Integer period;
-
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
     private Provenance provenance;
+
+	@ManyToOne(cascade = CascadeType.ALL, optional = false)
+	private TimeSeries timeseries;
+
+	@Column(nullable = false )
+	private String partition_id;
 
     public abstract List<RecordDto> findRecords(EntityManager em, String stationtype, String identifier, String cname,
             Date start, Date end, Integer period);
@@ -61,17 +59,9 @@ public abstract class MeasurementAbstractHistory implements Serializable {
         this.created_on = new Date();
     }
 
-    /**
-     * @param station   entity the measurement refers to
-     * @param type      entity the measurement refers to
-     * @param timestamp UTC time of the measurement detection
-     * @param period    standard interval between 2 measurements
-     */
-    protected MeasurementAbstractHistory(Station station, DataType type, Date timestamp, Integer period) {
-        this.station = station;
-        this.type = type;
+    protected MeasurementAbstractHistory(TimeSeries timeseries, Date timestamp) {
         this.timestamp = timestamp;
-        this.period = period;
+        this.timeseries = timeseries;
         this.created_on = new Date();
     }
 
@@ -91,30 +81,6 @@ public abstract class MeasurementAbstractHistory implements Serializable {
         this.timestamp = timestamp;
     }
 
-    public Station getStation() {
-        return station;
-    }
-
-    public void setStation(Station station) {
-        this.station = station;
-    }
-
-    public DataType getType() {
-        return type;
-    }
-
-    public void setType(DataType type) {
-        this.type = type;
-    }
-
-    public Integer getPeriod() {
-        return period;
-    }
-
-    public void setPeriod(Integer period) {
-        this.period = period;
-    }
-
     public Provenance getProvenance() {
         return provenance;
     }
@@ -123,8 +89,23 @@ public abstract class MeasurementAbstractHistory implements Serializable {
         this.provenance = provenance;
     }
 
+    public TimeSeries getTimeseries() {
+        return timeseries;
+    }
+
+    public void setTimeseries(TimeSeries timeseries) {
+        this.timeseries = timeseries;
+    }
+
+    public String getPartition_id() {
+        return partition_id;
+    }
+
+    public void setPartition_id(String partition_id) {
+        this.partition_id = partition_id;
+    }
+
     public abstract void setValue(Object value);
 
     public abstract Object getValue();
-
 }

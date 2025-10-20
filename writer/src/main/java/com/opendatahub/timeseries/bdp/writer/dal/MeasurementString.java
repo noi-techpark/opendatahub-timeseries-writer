@@ -1,5 +1,5 @@
 // Copyright © 2018 IDM Südtirol - Alto Adige (info@idm-suedtirol.com)
-// Copyright © 2019 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
+// Copyright © 2019-2025 NOI Techpark - Südtirol / Alto Adige (info@opendatahub.com)
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
@@ -16,7 +16,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.Lob;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
@@ -33,12 +32,12 @@ import jakarta.persistence.UniqueConstraint;
 	name = "measurementstring",
 	indexes = {
 		@Index(
-			columnList = "timestamp desc"
+			columnList = "timeseries_id, timestamp"
 		)
 	},
 	uniqueConstraints = {
 		@UniqueConstraint(
-			columnNames = {"station_id", "type_id", "period"}
+			columnNames = {"timeseries_id", "timestamp"}
 		)
 	}
 )
@@ -67,19 +66,11 @@ public class MeasurementString extends MeasurementAbstract {
 	public MeasurementString() {
 		super();
 	}
-	/**
-	 * @param station entity associated with this measurement
-	 * @param type entity associated with this measurement
-	 * @param value string value for this measurement
-	 * @param timestamp UTC time of measurement detection
-	 * @param period standard interval between 2 measurements
-	 */
-	public MeasurementString(Station station, DataType type, String value, Date timestamp, Integer period) {
-		this.setStation(station);
-		this.setType(type);
+
+	public MeasurementString(TimeSeries timeseries, String value, Date timestamp) {
 		this.setTimestamp(timestamp);
 		this.setCreated_on(new Date());
-		this.setPeriod(period);
+		this.setTimeseries(timeseries);
 		this.stringValue = value;
 	}
 
