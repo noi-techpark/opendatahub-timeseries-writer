@@ -56,11 +56,7 @@ public class MeasurementJSON extends MeasurementAbstract {
 
 
 	public MeasurementJSON() {
-	}
-
-	public MeasurementJSON(TimeSeries timeseries, Map<String, Object> json, Date timestamp) {
-		super(timeseries,timestamp);
-		this.jsonValue = json;
+		super();
 	}
 
 	public Long getId() {

@@ -12,6 +12,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 
@@ -29,8 +30,12 @@ import jakarta.persistence.MappedSuperclass;
  */
 @MappedSuperclass
 public abstract class MeasurementAbstract implements Serializable {
-
 	private static final long serialVersionUID = 1L;
+
+	// Measurements are 1:1 to timeseries, so we're using that as primary key
+	@Id
+	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	private TimeSeries timeseries;
 
 	@Column(nullable = false)
 	private Date created_on;
@@ -41,14 +46,7 @@ public abstract class MeasurementAbstract implements Serializable {
 	@ManyToOne(optional = true, fetch = FetchType.LAZY)
 	private Provenance provenance;
 
-	@ManyToOne(cascade = CascadeType.ALL, optional = false)
-	private TimeSeries timeseries;
-
-	@Column(nullable = false)
-	private String partition_id;
-
-	public abstract MeasurementAbstract findLatestEntry(EntityManager em, Station station, DataType type,
-			Integer period);
+	public abstract MeasurementAbstract findLatestEntry(EntityManager em, Station station, DataType type, Integer period);
 
 	public abstract Date getDateOfLastRecord(EntityManager em, Station station, DataType type, Integer period);
 
@@ -96,13 +94,5 @@ public abstract class MeasurementAbstract implements Serializable {
 
 	public void setTimeseries(TimeSeries timeseries) {
 		this.timeseries = timeseries;
-	}
-
-	public String getPartition_id() {
-		return partition_id;
-	}
-
-	public void setPartition_id(String partition_id) {
-		this.partition_id = partition_id;
 	}
 }

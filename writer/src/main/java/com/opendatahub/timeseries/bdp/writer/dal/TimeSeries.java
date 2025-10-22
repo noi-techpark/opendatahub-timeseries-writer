@@ -4,21 +4,16 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.function.Function;
 
 import org.hibernate.annotations.ColumnDefault;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
-import com.opendatahub.timeseries.bdp.dto.dto.RecordDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
@@ -29,6 +24,8 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -45,9 +42,9 @@ import jakarta.persistence.UniqueConstraint;
  */
 @Entity
 @Table(name = "timeseries", indexes = {
-		@Index(columnList = "station_id type_id")
+		@Index(columnList = "station_id, type_id")
 }, uniqueConstraints = {
-		@UniqueConstraint(columnNames = { "station_id type_id period value_table" })
+		@UniqueConstraint(columnNames = { "station_id", "type_id", "period", "value_table" })
 })
 public class TimeSeries {
 	@Id
@@ -66,15 +63,38 @@ public class TimeSeries {
 	private Integer period;
 
 	@Column(nullable = false)
-	private String value_table;
+	@Enumerated(EnumType.STRING)
+	private ValueTable value_table;
+	
+	public static enum ValueTable {
+		NUMBER("measurement", Measurement.class, MeasurementHistory.class),
+		STRING("measurementstring", MeasurementString.class, MeasurementStringHistory.class),
+		JSON("measurementjson", MeasurementJSON.class, MeasurementJSONHistory.class);
 
-	@Column(nullable = false)
-	private Partition partition;
-
-	protected TimeSeries() {
+		private final String table;
+		private final Class<? extends MeasurementAbstract> latestClass;
+		private final Class<? extends MeasurementAbstractHistory> historyClass;
+		
+		ValueTable(String table, Class<? extends MeasurementAbstract> latestClass, Class<? extends MeasurementAbstractHistory> historyClass) {
+			this.table = table;
+			this.latestClass = latestClass;
+			this.historyClass = historyClass;
+		}
+		
+		public String getCode() {
+			return table;
+		}
 	}
 
-	protected TimeSeries(Station station, DataType type, Integer period, String valueTable) {
+	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	private Partition partition;
+
+	public TimeSeries() {
+		this.partition = Partition.DEFAULT;
+	}
+
+	public TimeSeries(Station station, DataType type, Integer period, ValueTable valueTable) {
+		this.partition = Partition.DEFAULT;
 		this.station = station;
 		this.type = type;
 		this.period = period;
@@ -113,14 +133,37 @@ public class TimeSeries {
 		this.id = id;
 	}
 
-	public String getValueTable() {
-		return value_table;
+	public Partition getPartition() {
+		return partition;
 	}
 
-	public void setValueTable(String valueTable) {
+	public void setPartition(Partition partition) {
+		this.partition = partition;
+	}
+	
+	public ValueTable getValueTable () {
+		return value_table;
+	}
+	
+	public void setValueTable(ValueTable valueTable) {
 		this.value_table = valueTable;
 	}
-    private static final Logger LOG = LoggerFactory.getLogger(MeasurementAbstractHistory.class);
+
+	public static TimeSeries findTimeSeries(EntityManager em, Station station, DataType dataType, Integer period, ValueTable valueTable) {
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT timeseries FROM Timeseries ts")
+				.addSql( "WHERE ts.station = :station")
+				.addSql("AND ts.type = :type")
+				.addSql("AND ts.value_table = :value_table")
+				.setParameter("station", station)
+				.setParameter("type", dataType)
+				.setParameter("value_table", valueTable)
+				.setParameterIfNotNull("period", period, "and ts.period = :period")
+				.buildSingleResultOrNull(TimeSeries.class);
+	}
+
+	private static final Logger LOG = LoggerFactory.getLogger(MeasurementAbstractHistory.class);
 
 	/**
 	 * Retrieve the date of the last inserted record of {@code table}.
@@ -143,10 +186,11 @@ public class TimeSeries {
 
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT record.timestamp FROM " + table.getClass().getSimpleName() + " record",
-						"WHERE record.station = :station")
-				.setParameterIfNotNull("type", type, "AND record.type = :type")
-				.setParameterIfNotNull("period", period, "AND record.period = :period")
+				.addSql("SELECT record.timestamp FROM " + table.getClass().getSimpleName() + " record")
+				.addSql("JOIN record.timeseries t")
+				.addSql("WHERE t.station = :station")
+				.setParameterIfNotNull("type", type, "AND t.type = :type")
+				.setParameterIfNotNull("period", period, "AND t.period = :period")
 				.setParameter("station", station)
 				.addSql("ORDER BY record.timestamp DESC")
 				.buildSingleResultOrAlternative(Date.class, new Date(-1));
@@ -161,8 +205,9 @@ public class TimeSeries {
 				.init(em)
 				.nativeQuery()
 				.addSql("SELECT max(timestamp) FROM {h-schema}measurement m")
-				.addSql("JOIN {h-schema}station s ON s.id = m.station_id")
-				.addSql("JOIN {h-schema}type t ON t.id = m.type_id")
+				.addSql("JOIN {h-schema}timeseries ts ON ts.id = m.timeseries_id")
+				.addSql("JOIN {h-schema}station s ON s.id = ts.station_id")
+				.addSql("JOIN {h-schema}type t ON t.id = ts.type_id")
 				.addSql("WHERE stationtype = :stationtype AND stationcode = :stationcode")
 				.setParameterIfNotEmpty("type", dataTypeName, "AND cname = :type")
 				.setParameterIfNotNull("period", period, "AND period = :period")
@@ -170,8 +215,9 @@ public class TimeSeries {
 				.setParameter("stationcode", stationCode)
 				.addSql("UNION ALL")
 				.addSql("SELECT max(timestamp) FROM {h-schema}measurementjson m")
-				.addSql("JOIN {h-schema}station s ON s.id = m.station_id")
-				.addSql("JOIN {h-schema}type t ON t.id = m.type_id")
+				.addSql("JOIN {h-schema}timeseries ts ON ts.id = m.timeseries_id")
+				.addSql("JOIN {h-schema}station s ON s.id = ts.station_id")
+				.addSql("JOIN {h-schema}type t ON t.id = ts.type_id")
 				.addSql("WHERE stationtype = :stationtype AND stationcode = :stationcode")
 				.setParameterIfNotEmpty("type", dataTypeName, "AND cname = :type")
 				.setParameterIfNotNull("period", period, "AND period = :period")
@@ -179,8 +225,9 @@ public class TimeSeries {
 				.setParameter("stationcode", stationCode)
 				.addSql("UNION ALL")
 				.addSql("SELECT max(timestamp) FROM {h-schema}measurementstring m")
-				.addSql("JOIN {h-schema}station s ON s.id = m.station_id")
-				.addSql("JOIN {h-schema}type t ON t.id = m.type_id")
+				.addSql("JOIN {h-schema}timeseries ts ON ts.id = m.timeseries_id")
+				.addSql("JOIN {h-schema}station s ON s.id = ts.station_id")
+				.addSql("JOIN {h-schema}type t ON t.id = ts.type_id")
 				.addSql("WHERE stationtype = :stationtype AND stationcode = :stationcode")
 				.setParameterIfNotEmpty("type", dataTypeName, "AND cname = :type")
 				.setParameterIfNotNull("period", period, "AND period = :period")
@@ -209,19 +256,17 @@ public class TimeSeries {
 	 * @param table
 	 * @return
 	 */
-	public static <T extends MeasurementAbstract> MeasurementAbstract findLatestEntry(EntityManager em, Station station,
-			DataType type, Integer period, Class<T> subClass) {
-		if (station == null)
-			return null;
-
+	public MeasurementAbstract findLatestEntry(EntityManager em) {
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT record FROM " + subClass.getSimpleName() + " record WHERE record.station = :station")
+				.addSql("SELECT record FROM " + value_table.getCode() + " record")
+				.addSql("JOIN record.timeseries ts")
+				.addSql("WHERE ts.station = :station")
 				.setParameter("station", station)
-				.setParameterIfNotNull("type", type, "AND record.type = :type")
-				.setParameterIfNotNull("period", period, "AND record.period = :period")
+				.setParameterIfNotNull("type", type, "AND ts.type = :type")
+				.setParameterIfNotNull("period", period, "AND ts.period = :period")
 				.addSql("ORDER BY record.timestamp DESC")
-				.buildSingleResultOrNull(subClass);
+				.buildSingleResultOrNull(value_table.latestClass);
 	}
 
 	/**
@@ -240,15 +285,36 @@ public class TimeSeries {
 
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT record FROM " + table.getClass().getSimpleName() + " record",
-						"WHERE record.station = :station")
-				.setParameterIfNotNull("period", period, "AND record.period = :period")
+				.addSql("SELECT record FROM " + table.getClass().getSimpleName() + " record")
+				.addSql("JOIN record.timeseries ts")
+				.addSql("WHERE ts.station = :station")
+				.setParameterIfNotNull("period", period, "AND ts.period = :period")
 				.setParameterIfNotNull("type", type, "AND record.type = :type")
 				.setParameter("station", station)
 				.addSql("ORDER BY record.timestamp DESC")
 				.buildSingleResultOrNull(table.getClass());
 	}
+	
+	/* A record, but wrapped deliciously */
+	private static class RecordBurrito extends SimpleRecordDto {
+		private ValueTable table;
 
+		public RecordBurrito(SimpleRecordDto dto) {
+			Object valueObj = dto.getValue();
+			if (valueObj instanceof Number) {
+				table = ValueTable.NUMBER;
+			} else if (valueObj instanceof String) {
+				table = ValueTable.STRING;
+			} else if (valueObj instanceof Map) {
+				table = ValueTable.JSON;
+			}
+		}
+
+		public ValueTable getTable() {
+			return table;
+		}
+	}
+	
 	/**
 	 * <p>
 	 * persists all measurement data send to the writer from data collectors to the
@@ -271,7 +337,6 @@ public class TimeSeries {
 	 *                      {@link Station}, {@link DataType}<br/>
 	 *                      does not exist in the database yet
 	 */
-	@SuppressWarnings("unchecked")
 	public static void pushRecords(EntityManager em, String stationType, DataMapDto<RecordDtoImpl> dataMap) {
 		Log log = new Log(LOG, "pushRecords");
 		try {
@@ -284,102 +349,57 @@ public class TimeSeries {
 			var skippedDataTypes = new HashSet<String>();
 			int skippedCount = 0;
 
-			for (Entry<String, DataMapDto<RecordDtoImpl>> stationEntry : dataMap.getBranch().entrySet()) {
-				Station station = Station.findStation(em, stationType, stationEntry.getKey());
+			for (var stationBranch : dataMap.getBranch().entrySet()) {
+				Station station = Station.findStation(em, stationType, stationBranch.getKey());
 				if (station == null) {
-					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType,
-							stationEntry.getKey()));
+					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType, stationBranch.getKey()));
 					continue;
 				}
-				for (Entry<String, DataMapDto<RecordDtoImpl>> typeEntry : stationEntry.getValue().getBranch()
-						.entrySet()) {
+				for (var typeBranch : stationBranch.getValue().getBranch().entrySet()) {
 					try {
-						DataType type = DataType.findByCname(em, typeEntry.getKey());
+						DataType type = DataType.findByCname(em, typeBranch.getKey());
 						if (type == null) {
-							log.warn(String.format("Type '%s' not found. Skipping...", typeEntry.getKey()));
+							log.warn(String.format("Type '%s' not found. Skipping...", typeBranch.getKey()));
 							continue;
 						}
-						List<? extends RecordDtoImpl> dataRecords = typeEntry.getValue().getData();
+						var dataRecords = typeBranch.getValue().getData();
 						if (dataRecords.isEmpty()) {
 							log.warn("Empty data set. Skipping...");
 							continue;
 						}
-						dataRecords.sort((l, r) -> Long.compare(l.getTimestamp(), r.getTimestamp()));
-
-						// Some datacollectors write multiple periods in a single call.
-						// They need to be handled as if they were separate datatypes, each with their
-						// own latest measurement
-						Map<Integer, Period> periods = new HashMap<>();
+						
+						// group records by datatype / period and sort by timestamp
+						// grouping to handle mixed value types (e.g. string/double) and periods within the same type
+						// timestamp sort to discard duplicate timestamps (because we compare against the running latest)
+						var simpleRecords = dataRecords.stream()
+							.map((r) -> new RecordBurrito((SimpleRecordDto)r))
+							.sorted(Comparator.comparing(RecordBurrito::getTable)
+								.thenComparing(RecordBurrito::getPeriod)
+								.thenComparing(RecordBurrito::getTimestamp))
+							.toList();
 
 						em.getTransaction().begin();
+						
+						Series series = new Series(em, station, type, null, null);
 
-						for (RecordDtoImpl recordDto : dataRecords) {
-							SimpleRecordDto simpleRecordDto = (SimpleRecordDto) recordDto;
-							Integer periodSeconds = simpleRecordDto.getPeriod();
-							if (periodSeconds == null) {
-								log.error("No period specified. Skipping...");
-								continue;
-							}
-							Period period = periods.get(periodSeconds);
-							if (period == null) {
-								period = new Period(em, station, type, periodSeconds, provenance);
-								periods.put(periodSeconds, period);
+						for (RecordBurrito record : simpleRecords) {
+							if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
+								series.updateLatest(em, provenance);
+								series = new Series(em, station, type, record.getPeriod(), record.getTable());
 							}
 
-							Date dateOfMeasurement = new Date(recordDto.getTimestamp());
-							Object valueObj = simpleRecordDto.getValue();
+							series.addHistory(em, record, provenance);
 
-							if (valueObj instanceof Number) {
-								MeasurementHistory rec = new MeasurementHistory(station, type,
-										((Number) valueObj).doubleValue(),
-										dateOfMeasurement, periodSeconds);
-								period.number.addHistory(em, log, simpleRecordDto, rec);
-							} else if (valueObj instanceof String) {
-								MeasurementStringHistory rec = new MeasurementStringHistory(station, type,
-										(String) valueObj,
-										dateOfMeasurement, periodSeconds);
-								period.string.addHistory(em, log, simpleRecordDto, rec);
-							} else if (valueObj instanceof Map) {
-								MeasurementJSONHistory rec = new MeasurementJSONHistory(station, type,
-										(Map<String, Object>) valueObj,
-										dateOfMeasurement, periodSeconds);
-								period.json.addHistory(em, log, simpleRecordDto, rec);
-							} else {
-								log.warn(
-										String.format(
-												"Unsupported data format for %s/%s/%s with value '%s'. Skipping...",
-												stationType,
-												stationEntry.getKey(),
-												typeEntry.getKey(),
-												(valueObj == null ? "(null)" : valueObj.getClass().getSimpleName())));
+							if (series.skippedCount > 0) {
+								skippedDataTypes.add(type.getCname());
+								skippedCount += series.skippedCount;
 							}
 						}
-
-						for (Period period : periods.values()) {
-							period.number.updateLatest(em, (newest) -> {
-								return new Measurement(station, type, ((Number) newest.getValue()).doubleValue(),
-										new Date(newest.getTimestamp()), period.period);
-							});
-							period.string.updateLatest(em, (newest) -> {
-								return new MeasurementString(station, type, (String) newest.getValue(),
-										new Date(newest.getTimestamp()),
-										period.period);
-							});
-							period.json.updateLatest(em, (newest) -> {
-								return new MeasurementJSON(station, type, (Map<String, Object>) newest.getValue(),
-										new Date(newest.getTimestamp()),
-										period.period);
-							});
-
-							skippedDataTypes.add(type.getCname());
-							skippedCount += period.skippedCount;
-						}
+						series.updateLatest(em, provenance);
 
 						em.getTransaction().commit();
 					} catch (Exception ex) {
-						log.error(
-								String.format("Exception '%s'... Skipping this measurement!", ex.getMessage()),
-								ex);
+						log.error( String.format("Exception '%s'... Skipping this measurement branch!", ex.getMessage()), ex);
 						LOG.debug("Printing stack trace", ex);
 					} finally {
 						if (em.getTransaction().isActive()) {
@@ -390,9 +410,7 @@ public class TimeSeries {
 			}
 
 			if (skippedCount > 0) {
-				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]",
-						skippedCount,
-						stationType, String.join(", ", skippedDataTypes)));
+				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]", skippedCount, stationType, String.join(", ", skippedDataTypes)));
 			}
 		} catch (Exception e) {
 			throw JPAException.unnest(e);
@@ -405,127 +423,90 @@ public class TimeSeries {
 				em.close();
 		}
 	}
+	
+	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp) {
+		try {
+			MeasurementAbstractHistory rec = value_table.historyClass.getDeclaredConstructor().newInstance();
+			rec.setTimeseries(this);
+			rec.setPartition(partition);
+			rec.setValue(value);
+			rec.setTimestamp(timestamp);
+			return rec;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-	private static class Period {
-		public Series number;
-		public Series string;
-		public Series json;
+	private MeasurementAbstract newLatestRecord(Object value, Date timestamp) {
+		try {
+			MeasurementAbstract rec = value_table.latestClass.getDeclaredConstructor().newInstance();
+			rec.setTimeseries(this);
+			rec.setValue(value);
+			rec.setTimestamp(timestamp);
+			return rec;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 
-		private Station station;
-		private DataType type;
-		private Integer period;
-		private Provenance provenance;
+	private static class Series {
 		public int skippedCount = 0;
 
-		private class Series {
-			private MeasurementAbstract latest;
-			private long newestTime;
-			private RecordDtoImpl newest;
-
-			public Series(EntityManager em, Class<? extends MeasurementAbstract> clazz) {
-				latest = TimeSeries.findLatestEntry(em, station, type, period, clazz);
-				newestTime = (latest != null) ? latest.getTimestamp().getTime() : 0;
-				newest = null;
-			}
-
-			private void updateNewest(RecordDtoImpl dto) {
-				if (newest == null || newest.getTimestamp() < dto.getTimestamp()) {
-					newest = dto;
-					newestTime = newest.getTimestamp();
-				}
-			}
-
-			public void addHistory(EntityManager em, Log log, SimpleRecordDto dto, MeasurementAbstractHistory rec) {
-				// In case of duplicates within a single push, which one is written and which
-				// one is discarded, is undefined (depends on the record sorting above)
-				if (newestTime < dto.getTimestamp()) {
-					rec.setProvenance(provenance);
-					em.persist(rec);
-					updateNewest(dto);
-				} else {
-					LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
-							station.stationtype, station.stationcode, type.getCname(), period, dto.getTimestamp()));
-					skippedCount++;
-				}
-			}
-
-			public void updateLatest(EntityManager em, Function<RecordDtoImpl, MeasurementAbstract> measurementMapper) {
-				if (newest != null) {
-					var measurement = measurementMapper.apply(newest);
-					if (latest == null) {
-						measurement.setProvenance(provenance);
-						em.persist(measurement);
-					} else if (newest.getTimestamp() > latest.getTimestamp().getTime()) {
-						latest.setTimestamp(new Date(newest.getTimestamp()));
-						latest.setValue(measurement.getValue());
-						latest.setProvenance(provenance);
-						em.merge(latest);
-					}
-				}
+		private MeasurementAbstract latest;
+		private long newestTime;
+		private RecordDtoImpl newest;
+		private TimeSeries timeseries;
+		
+		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
+			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period && table == timeseries.getValueTable();
+		}
+		
+		public Series(EntityManager em, Station station, DataType type, Integer period, ValueTable table) {
+			timeseries = TimeSeries.findTimeSeries(em, station, type, period, table);
+			latest = (timeseries != null) ? timeseries.findLatestEntry(em) : null;
+			newestTime = (latest != null) ? latest.getTimestamp().getTime() : 0;
+			newest = null;
+			
+			if (timeseries == null) {
+				timeseries = new TimeSeries(station, type, period, table);
 			}
 		}
 
-		public Period(EntityManager em, Station station, DataType type, Integer period, Provenance provenance) {
-			this.station = station;
-			this.type = type;
-			this.period = period;
-			this.provenance = provenance;
-
-			number = new Series(em, Measurement.class);
-			string = new Series(em, MeasurementString.class);
-			json = new Series(em, MeasurementJSON.class);
+		private void updateNewest(RecordDtoImpl dto) {
+			if (newest == null || newest.getTimestamp() < dto.getTimestamp()) {
+				newest = dto;
+				newestTime = newest.getTimestamp();
+			}
 		}
-	}
 
-	private static List<RecordDto> castToDtos(List<MeasurementAbstractHistory> result, boolean setPeriod) {
-		List<RecordDto> dtos = new ArrayList<>();
-		for (MeasurementAbstractHistory m : result) {
-			SimpleRecordDto dto = new SimpleRecordDto(m.getTimestamp().getTime(), m.getValue(),
-					setPeriod ? m.getTimeseries().getPeriod() : null);
-			dto.setCreated_on(m.getCreated_on().getTime());
-			dtos.add(dto);
+		public void addHistory(EntityManager em, SimpleRecordDto dto, Provenance provenance) throws Exception {
+			// In case of duplicates within a single push, which one is written and which
+			// one is discarded, is undefined (depends on the record sorting above)
+			if (newestTime < dto.getTimestamp()) {
+				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(), new Date(dto.getTimestamp()));
+				rec.setProvenance(provenance);
+				em.persist(rec);
+				updateNewest(dto);
+			} else {
+				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
+						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(), timeseries.period, dto.getTimestamp()));
+				skippedCount++;
+			}
 		}
-		return dtos;
-	}
 
-	/**
-	 * <p>
-	 * the only method which requests history data from the biggest existing tables
-	 * in the underlying DB,<br/>
-	 * it's very important that indexes are set correctly to avoid bad performance
-	 * </p>
-	 * 
-	 * @param em          entity manager
-	 * @param typology    of the specific station, e.g., MeteoStation,
-	 *                    EnvironmentStation
-	 * @param identifier  unique station identifier, required
-	 * @param cname       unique type identifier, required
-	 * @param start       time filter start in milliseconds UTC for query, required
-	 * @param end         time filter start in milliseconds UTC for query, required
-	 * @param period      interval between measurements
-	 * @param tableObject implementation which calls this method to decide which
-	 *                    table to query, required
-	 * @return a list of measurements from history tables
-	 */
-	protected static <T> List<RecordDto> findRecordsImpl(EntityManager em, String stationtype, String identifier,
-			String cname, Date start, Date end, Integer period, T tableObject) {
-		List<MeasurementAbstractHistory> result = QueryBuilder
-				.init(em)
-				.addSql("SELECT record")
-				.addSql("FROM  " + tableObject.getClass().getSimpleName() + " record",
-						"WHERE record.station = (",
-						"SELECT s FROM Station s WHERE s.stationtype = :stationtype AND s.stationcode = :stationcode",
-						")",
-						"AND record.type = (SELECT t FROM DataType t WHERE t.cname = :cname)",
-						"AND record.timestamp between :start AND :end")
-				.setParameterIfNotNull("period", period, "AND record.period = :period")
-				.setParameter("stationtype", stationtype)
-				.setParameter("stationcode", identifier)
-				.setParameter("cname", cname)
-				.setParameter("start", start)
-				.setParameter("end", end)
-				.addSql("ORDER BY record.timestamp")
-				.buildResultList(MeasurementAbstractHistory.class);
-		return TimeSeries.castToDtos(result, period == null);
+		public void updateLatest(EntityManager em, Provenance provenance) {
+			if (newest != null) {
+				if (latest == null) {
+					var measurement = timeseries.newLatestRecord(newest.getValue(), new Date(newest.getTimestamp()));
+					measurement.setProvenance(provenance);
+					em.persist(measurement);
+				} else if (newest.getTimestamp() > latest.getTimestamp().getTime()) {
+					latest.setTimestamp(new Date(newest.getTimestamp()));
+					latest.setValue(newest.getValue());
+					latest.setProvenance(provenance);
+					em.merge(latest);
+				}
+			}
+		}
 	}
 }

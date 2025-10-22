@@ -7,14 +7,13 @@ package com.opendatahub.timeseries.bdp.writer.dal;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.List;
-
-import com.opendatahub.timeseries.bdp.dto.dto.RecordDto;
+import java.util.Objects;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 
@@ -33,27 +32,26 @@ import jakarta.persistence.MappedSuperclass;
  * @author Clemens Zagler
  */
 @MappedSuperclass
+@IdClass(MeasurementAbstractHistory.MeasurementHistoryId.class)
 public abstract class MeasurementAbstractHistory implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
-    @Column(nullable = false)
-    private Date created_on;
-
+    @Id
     @Column(nullable = false)
     private Date timestamp;
+
+    @Id
+    @ManyToOne(optional = false)
+    private TimeSeries timeseries;
 
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
     private Provenance provenance;
 
-	@ManyToOne(cascade = CascadeType.ALL, optional = false)
-	private TimeSeries timeseries;
+    @Column(nullable = false)
+    private Date created_on;
 
-	@Column(nullable = false )
-	private String partition_id;
-
-    public abstract List<RecordDto> findRecords(EntityManager em, String stationtype, String identifier, String cname,
-            Date start, Date end, Integer period);
+    @ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+    private Partition partition;
 
     protected MeasurementAbstractHistory() {
         this.created_on = new Date();
@@ -97,15 +95,37 @@ public abstract class MeasurementAbstractHistory implements Serializable {
         this.timeseries = timeseries;
     }
 
-    public String getPartition_id() {
-        return partition_id;
+    public Partition getPartition() {
+        return partition;
     }
 
-    public void setPartition_id(String partition_id) {
-        this.partition_id = partition_id;
+    public void setPartition(Partition partition) {
+        this.partition = partition;
     }
 
     public abstract void setValue(Object value);
 
     public abstract Object getValue();
+
+    /** History records don't have an ID, but they are unique for each timeseries_id and timestamp, so we use that as composite for JPA */
+    public class MeasurementHistoryId implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        public Long timeseries; // Must match field name and be the ID type of TimeSeries
+        public Date timestamp;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof MeasurementHistoryId)) return false;
+            MeasurementHistoryId that = (MeasurementHistoryId) o;
+            return Objects.equals(timeseries, that.timeseries)
+                && Objects.equals(timestamp, that.timestamp);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(timeseries, timestamp);
+        }
+    }
 }

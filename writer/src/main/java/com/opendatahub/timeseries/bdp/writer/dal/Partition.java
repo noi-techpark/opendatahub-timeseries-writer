@@ -18,7 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 /**
-* Partition represents a partition key used to partition measurement history.
+ * Partition represents a partition key used to partition measurement history.
  */
 @Entity
 @Table(name = "partition", indexes = {
@@ -27,6 +27,15 @@ import jakarta.persistence.UniqueConstraint;
 		@UniqueConstraint(columnNames = { "name" })
 })
 public class Partition {
+	
+	public static Partition DEFAULT;
+	static{ 
+		Partition partition = new Partition();
+		partition.setId(1L);
+		partition.setName("default");
+		partition.setDescription("Default Partition");
+		DEFAULT = partition;
+	}
 
 	@Id
 	@GeneratedValue(generator = "partition_gen", strategy = GenerationType.SEQUENCE)
@@ -62,5 +71,13 @@ public class Partition {
 
 	public void setDescription(String description) {
 		this.description = description;
+	}
+
+	public static Partition Default() {
+		Partition partition = new Partition();
+		partition.setId(1L);
+		partition.setName("default");
+		partition.setDescription("Default Partition");
+		return partition;
 	}
 }

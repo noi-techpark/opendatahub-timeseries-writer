@@ -67,13 +67,6 @@ public class MeasurementString extends MeasurementAbstract {
 		super();
 	}
 
-	public MeasurementString(TimeSeries timeseries, String value, Date timestamp) {
-		this.setTimestamp(timestamp);
-		this.setCreated_on(new Date());
-		this.setTimeseries(timeseries);
-		this.stringValue = value;
-	}
-
 	public Long getId() {
 		return id;
 	}

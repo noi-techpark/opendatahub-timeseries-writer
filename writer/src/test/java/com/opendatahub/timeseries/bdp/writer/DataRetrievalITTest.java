@@ -25,7 +25,6 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
@@ -61,7 +60,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		Station station = Station.findStation(em, this.station.getStationtype(), this.station.getStationcode());
 		MeasurementAbstract latestEntry = new Measurement().findLatestEntry(em, station, type, period);
 		assertNotNull(latestEntry);
-		assertEquals(period, latestEntry.getPeriod());
+		assertEquals(period, latestEntry.getTimeseries().getPeriod());
 		assertTrue(this.station.getActive());
 		assertTrue(this.station.getAvailable());
 	}
@@ -138,11 +137,11 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	public void testDuplicateMeasurements() {
 		List<RecordDtoImpl> values = new ArrayList<>();
 		values.add(new SimpleRecordDto(measurementOld.getTimestamp().getTime(), measurementOld.getValue(),
-				measurementOld.getPeriod()));
+				measurementOld.getTimeseries().getPeriod()));
 		values.add(new SimpleRecordDto(measurement.getTimestamp().getTime(), measurement.getValue(),
-				measurement.getPeriod()));
+				measurement.getTimeseries().getPeriod()));
 		values.add(new SimpleRecordDto(measurementOld.getTimestamp().getTime(), measurementOld.getValue(),
-				measurementOld.getPeriod()));
+				measurementOld.getTimeseries().getPeriod()));
 
 		// Number measurements newer as the latest entry
 		values.add(new SimpleRecordDto(measurement.getTimestamp().getTime() + 1000, 3.33, 1800));
