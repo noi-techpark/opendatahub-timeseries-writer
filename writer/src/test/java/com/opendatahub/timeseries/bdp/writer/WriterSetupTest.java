@@ -27,7 +27,6 @@ import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Measurement;
-import com.opendatahub.timeseries.bdp.writer.dal.Partition;
 import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.dal.TimeSeries;
@@ -55,13 +54,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
     @Autowired
     DataManager dataManager;
 
-    /**
-     * This is the prefix for all things created inside a DB, which will
-     * also be delete, so please careful what you set here! We add it prior
-     * to any entity's natural key.
-     */
-    protected static final String PREFIX = "--TEST--";
-    protected static final String STATION_TYPE = PREFIX + "Environment";
+    protected static final String STATION_TYPE = "Environment";
 
     protected EntityManager em;
     protected Station station;
@@ -98,8 +91,8 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
 
         em = entityManagerFactory.createEntityManager();
 
-        station = new Station(STATION_TYPE, PREFIX + "Station01", "Station One");
-        type = new DataType(PREFIX + "NO2", "mg", "Fake type", "Instants");
+        station = new Station(STATION_TYPE, "Station01", "Station One");
+        type = new DataType("NO2", "mg", "Fake type", "Instants");
         Date today = new Date();
         TimeSeries ts = new TimeSeries(station, type, 500, TimeSeries.ValueTable.NUMBER);
         measurement = new Measurement();

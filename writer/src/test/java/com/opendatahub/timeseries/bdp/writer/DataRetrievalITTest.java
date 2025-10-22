@@ -45,11 +45,11 @@ public class DataRetrievalITTest extends WriterSetupTest {
 
 	@Test
 	public void testStationFetch() {
-		Station station = Station.findStation(em, PREFIX + "non-existent-stationtype", PREFIX + "hey");
+		Station station = Station.findStation(em, "non-existent-stationtype", "hey");
 		assertNull(station);
-		List<Station> stationsWithOrigin = Station.findStations(em, PREFIX + "TrafficSensor", PREFIX + "FAMAS-traffic");
+		List<Station> stationsWithOrigin = Station.findStations(em, "TrafficSensor", "FAMAS-traffic");
 		assertNotNull(stationsWithOrigin);
-		List<Station> stations = Station.findStations(em, PREFIX + "TrafficSensor", null);
+		List<Station> stations = Station.findStations(em, "TrafficSensor", null);
 		assertNotNull(stations);
 	}
 
@@ -67,11 +67,11 @@ public class DataRetrievalITTest extends WriterSetupTest {
 
 	@Test
 	public void testSyncStations() {
-		StationDto s = new StationDto(PREFIX + "WRITER", "Some name", null, null);
+		StationDto s = new StationDto("WRITER", "Some name", null, null);
 		List<StationDto> dtos = new ArrayList<StationDto>();
 		dtos.add(s);
 		ResponseEntity<Object> result = dataManager.syncStations(
-				PREFIX + "EnvironmentStation",
+				"EnvironmentStation",
 				dtos,
 				null,
 				"testProvenance",
@@ -83,7 +83,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 
 	@Test
 	public void testSyncDataTypes() {
-		DataTypeDto t = new DataTypeDto(PREFIX + "WRITER", null, null, null);
+		DataTypeDto t = new DataTypeDto("WRITER", null, null, null);
 		List<DataTypeDto> dtos = new ArrayList<DataTypeDto>();
 		dtos.add(t);
 		ResponseEntity<Object> result = dataManager.syncDataTypes(dtos, null);
@@ -119,9 +119,9 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	@Test
 	public void testDuplicateStations() {
 		List<StationDto> dtos = new ArrayList<StationDto>();
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 1", null, null));
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 1", null, null));
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 2", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 1", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 1", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 2", null, null));
 		ResponseEntity<Object> result = dataManager.syncStations(
 				STATION_TYPE,
 				dtos,
@@ -164,7 +164,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	
 	@Test
 	public void testPushRecords(){
-		DataType tCount = new DataType(PREFIX + "reccount", "", "Fake type", "test");
+		DataType tCount = new DataType("reccount", "", "Fake type", "test");
 		em.getTransaction().begin();
 		em.persist(tCount);
 		em.getTransaction().commit();
