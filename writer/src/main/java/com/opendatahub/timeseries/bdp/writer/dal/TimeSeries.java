@@ -42,7 +42,7 @@ import jakarta.persistence.UniqueConstraint;
  */
 @Entity
 @Table(name = "timeseries", indexes = {
-		@Index(columnList = "station_id, type_id")
+		@Index(columnList = "station_id, type_id"),
 }, uniqueConstraints = {
 		@UniqueConstraint(columnNames = { "station_id", "type_id", "period", "value_table" })
 })
