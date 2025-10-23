@@ -113,6 +113,9 @@ public abstract class MeasurementAbstractHistory implements Serializable {
 
         public Long timeseries; // Must match field name and be the ID type of TimeSeries
         public Date timestamp;
+        
+        public MeasurementHistoryId(){
+        }
 
         @Override
         public boolean equals(Object o) {
