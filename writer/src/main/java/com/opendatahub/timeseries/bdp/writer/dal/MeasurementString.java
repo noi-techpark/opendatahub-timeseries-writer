@@ -7,16 +7,10 @@ package com.opendatahub.timeseries.bdp.writer.dal;
 
 import java.util.Date;
 
-import org.hibernate.annotations.ColumnDefault;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
@@ -30,28 +24,14 @@ import jakarta.persistence.UniqueConstraint;
  */
 @Table(
 	name = "measurementstring",
-	indexes = {
-		@Index(
-			columnList = "timeseries_id, timestamp"
-		)
-	},
-	uniqueConstraints = {
-		@UniqueConstraint(
-			columnNames = {"timeseries_id", "timestamp"}
-		)
-	}
+	indexes = { @Index( columnList = "timeseries_id, timestamp") },
+	uniqueConstraints = { @UniqueConstraint( columnNames = {"timeseries_id"}) }
 )
 @Entity
 public class MeasurementString extends MeasurementAbstract {
 
 	@Transient
 	private static final long serialVersionUID = -4378235887347510723L;
-
-	@Id
-	@GeneratedValue(generator = "measurementstring_gen", strategy = GenerationType.SEQUENCE)
-	@SequenceGenerator(name = "measurementstring_gen", sequenceName = "measurementstring_seq", allocationSize = 1)
-	@ColumnDefault(value = "nextval('measurementstring_seq')")
-	private Long id;
 
     /*
      * Make sure all subclasses of M contain different value names. If these
@@ -65,14 +45,6 @@ public class MeasurementString extends MeasurementAbstract {
 
 	public MeasurementString() {
 		super();
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
 	}
 
 	public String getValue() {

@@ -147,20 +147,13 @@ public void cleanup() {
         em.createQuery("DELETE FROM MeasurementStringHistory").executeUpdate();
         em.createQuery("DELETE FROM MeasurementJSON").executeUpdate();
         em.createQuery("DELETE FROM MeasurementJSONHistory").executeUpdate();
-
-        em.createQuery("DELETE FROM Timeseries").executeUpdate();
-        em.createQuery("DELETE FROM Partition").executeUpdate();
-        
-        // Clear metadata references and delete metadata
+        em.createQuery("DELETE FROM TimeSeries").executeUpdate();
+        // em.createQuery("DELETE FROM Partition").executeUpdate();
+        em.createQuery("DELETE FROM Event").executeUpdate();
         em.createQuery("UPDATE Station SET metaData = NULL").executeUpdate();
         em.createQuery("DELETE FROM MetaData").executeUpdate();
-        
-        // Delete stations and data types
         em.createQuery("DELETE FROM Station").executeUpdate();
         em.createQuery("DELETE FROM DataType").executeUpdate();
-        
-        // Delete events and provenance
-        em.createQuery("DELETE FROM Event").executeUpdate();
         em.createQuery("DELETE FROM Provenance").executeUpdate();
         
         em.getTransaction().commit();

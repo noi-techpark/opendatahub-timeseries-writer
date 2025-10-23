@@ -27,6 +27,8 @@ create table  timeseries (
 	constraint fk_timeseries_station foreign key (station_id) references "station"(id),
 	constraint fk_timeseries_type foreign key (type_id) references "type"(id)
 );
+create index idx_timeseries_station on timeseries(station_id);
+create index idx_timeseries_type on timeseries(type_id);
 
 insert into timeseries (station_id, type_id, period, value_table) 
 select station_id, type_id, period, 'measurement' from measurement

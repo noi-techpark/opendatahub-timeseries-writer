@@ -9,11 +9,11 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.Objects;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 
@@ -37,11 +37,12 @@ public abstract class MeasurementAbstractHistory implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @Column(nullable = false)
+    @Column(name = "timestamp", nullable = false)
     private Date timestamp;
 
     @Id
     @ManyToOne(optional = false)
+    @JoinColumn(name = "timeseries_id")
     private TimeSeries timeseries;
 
     @ManyToOne(optional = true, fetch = FetchType.LAZY)
@@ -50,7 +51,7 @@ public abstract class MeasurementAbstractHistory implements Serializable {
     @Column(nullable = false)
     private Date created_on;
 
-    @ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+    @ManyToOne(optional = false)
     private Partition partition;
 
     protected MeasurementAbstractHistory() {
@@ -108,7 +109,7 @@ public abstract class MeasurementAbstractHistory implements Serializable {
     public abstract Object getValue();
 
     /** History records don't have an ID, but they are unique for each timeseries_id and timestamp, so we use that as composite for JPA */
-    public class MeasurementHistoryId implements Serializable {
+    public static class MeasurementHistoryId implements Serializable {
         private static final long serialVersionUID = 1L;
 
         public Long timeseries; // Must match field name and be the ID type of TimeSeries

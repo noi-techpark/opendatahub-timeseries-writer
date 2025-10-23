@@ -26,7 +26,7 @@ SPDX-License-Identifier: CC0-1.0
 		</encoder>
 	</appender>
 
-	<logger level="${LOG_LEVEL:-INFO}" name="com.opendatahub.timeseries.bdp" additivity="false">
+	<logger level="${LOG_LEVEL:-DEBUG}" name="com.opendatahub.timeseries.bdp" additivity="false">
 		<appender-ref ref="${LOG_STYLE:-text}" />
 	</logger>
 

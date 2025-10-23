@@ -179,7 +179,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		var dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
 		
-		var qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		var qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		// all there
 		assertEquals(3L, qResult.intValue());
 		
@@ -189,7 +189,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		recs.add(new SimpleRecordDto(ts+3, 1.3, 600));
 		dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
-		qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		assertEquals(4L, qResult.intValue());
 
 		// Insert different periods, should ignore one record for each period because of timestamp
@@ -201,7 +201,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		recs.add(new SimpleRecordDto(ts, 1.3, 10));
 		dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
-		qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		assertEquals(7, qResult.intValue());
 	}
 

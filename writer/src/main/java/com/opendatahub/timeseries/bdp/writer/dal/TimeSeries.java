@@ -42,7 +42,8 @@ import jakarta.persistence.UniqueConstraint;
  */
 @Entity
 @Table(name = "timeseries", indexes = {
-		@Index(columnList = "station_id, type_id"),
+		@Index(columnList = "station_id"),
+		@Index(columnList = "type_id"),
 }, uniqueConstraints = {
 		@UniqueConstraint(columnNames = { "station_id", "type_id", "period", "value_table" })
 })
@@ -67,9 +68,9 @@ public class TimeSeries {
 	private ValueTable value_table;
 	
 	public static enum ValueTable {
-		NUMBER("measurement", Measurement.class, MeasurementHistory.class),
-		STRING("measurementstring", MeasurementString.class, MeasurementStringHistory.class),
-		JSON("measurementjson", MeasurementJSON.class, MeasurementJSONHistory.class);
+		NUMBER("Measurement", Measurement.class, MeasurementHistory.class),
+		STRING("MeasurementString", MeasurementString.class, MeasurementStringHistory.class),
+		JSON("MeasurementJSON", MeasurementJSON.class, MeasurementJSONHistory.class);
 
 		private final String table;
 		private final Class<? extends MeasurementAbstract> latestClass;
@@ -80,13 +81,17 @@ public class TimeSeries {
 			this.latestClass = latestClass;
 			this.historyClass = historyClass;
 		}
+
+		public String getTable() {
+			return table;
+		}
 		
 		public String getCode() {
 			return table;
 		}
 	}
 
-	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	@ManyToOne(optional = false)
 	private Partition partition;
 
 	public TimeSeries() {
@@ -152,7 +157,7 @@ public class TimeSeries {
 	public static TimeSeries findTimeSeries(EntityManager em, Station station, DataType dataType, Integer period, ValueTable valueTable) {
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT timeseries FROM Timeseries ts")
+				.addSql("SELECT ts FROM TimeSeries ts")
 				.addSql( "WHERE ts.station = :station")
 				.addSql("AND ts.type = :type")
 				.addSql("AND ts.value_table = :value_table")
@@ -163,7 +168,7 @@ public class TimeSeries {
 				.buildSingleResultOrNull(TimeSeries.class);
 	}
 
-	private static final Logger LOG = LoggerFactory.getLogger(MeasurementAbstractHistory.class);
+	private static final Logger LOG = LoggerFactory.getLogger(TimeSeries.class);
 
 	/**
 	 * Retrieve the date of the last inserted record of {@code table}.
@@ -259,7 +264,7 @@ public class TimeSeries {
 	public MeasurementAbstract findLatestEntry(EntityManager em) {
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT record FROM " + value_table.getCode() + " record")
+				.addSql("SELECT record FROM " + value_table.getTable() + " record")
 				.addSql("JOIN record.timeseries ts")
 				.addSql("WHERE ts.station = :station")
 				.setParameter("station", station)
@@ -289,7 +294,7 @@ public class TimeSeries {
 				.addSql("JOIN record.timeseries ts")
 				.addSql("WHERE ts.station = :station")
 				.setParameterIfNotNull("period", period, "AND ts.period = :period")
-				.setParameterIfNotNull("type", type, "AND record.type = :type")
+				.setParameterIfNotNull("type", type, "AND ts.type = :type")
 				.setParameter("station", station)
 				.addSql("ORDER BY record.timestamp DESC")
 				.buildSingleResultOrNull(table.getClass());
@@ -300,6 +305,8 @@ public class TimeSeries {
 		private ValueTable table;
 
 		public RecordBurrito(SimpleRecordDto dto) {
+			super(dto.getTimestamp(), dto.getValue(), dto.getPeriod(), dto.getCreated_on());
+
 			Object valueObj = dto.getValue();
 			if (valueObj instanceof Number) {
 				table = ValueTable.NUMBER;

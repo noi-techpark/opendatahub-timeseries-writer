@@ -13,6 +13,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 
@@ -35,6 +36,7 @@ public abstract class MeasurementAbstract implements Serializable {
 	// Measurements are 1:1 to timeseries, so we're using that as primary key
 	@Id
 	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+    @JoinColumn(name = "timeseries_id")
 	private TimeSeries timeseries;
 
 	@Column(nullable = false)

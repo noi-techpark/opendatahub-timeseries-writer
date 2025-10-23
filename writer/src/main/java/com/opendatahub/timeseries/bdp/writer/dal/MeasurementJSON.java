@@ -48,23 +48,8 @@ public class MeasurementJSON extends MeasurementAbstract {
 	@Transient
 	private static final long serialVersionUID = 8498633392410463424L;
 
-	@Id
-	@GeneratedValue(generator = "measurement_json_gen", strategy = GenerationType.SEQUENCE)
-	@SequenceGenerator(name = "measurement_json_gen", sequenceName = "measurement_json_seq", allocationSize = 1)
-	@ColumnDefault(value = "nextval('measurement_json_seq')")
-	private Long id;
-
-
 	public MeasurementJSON() {
 		super();
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
 	}
 
 	@JdbcTypeCode(SqlTypes.JSON)
