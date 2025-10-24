@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.Objects;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -41,7 +42,7 @@ public abstract class MeasurementAbstractHistory implements Serializable {
     private Date timestamp;
 
     @Id
-    @ManyToOne(optional = false)
+	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
     @JoinColumn(name = "timeseries_id")
     private TimeSeries timeseries;
 

@@ -7,8 +7,10 @@ package com.opendatahub.timeseries.bdp.writer.dal;
 
 import org.hibernate.annotations.ColumnDefault;
 
+import jakarta.persistence.Cacheable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,16 +28,8 @@ import jakarta.persistence.UniqueConstraint;
 }, uniqueConstraints = {
 		@UniqueConstraint(columnNames = { "name" })
 })
+@Cacheable
 public class Partition {
-	
-	public static Partition DEFAULT;
-	static{ 
-		Partition partition = new Partition();
-		partition.setId(1L);
-		partition.setName("default");
-		partition.setDescription("Default Partition");
-		DEFAULT = partition;
-	}
 
 	@Id
 	@GeneratedValue(generator = "partition_gen", strategy = GenerationType.SEQUENCE)
@@ -73,11 +67,14 @@ public class Partition {
 		this.description = description;
 	}
 
-	public static Partition Default() {
-		Partition partition = new Partition();
-		partition.setId(1L);
-		partition.setName("default");
-		partition.setDescription("Default Partition");
+	public static Partition getDefault(EntityManager em) {
+		Partition partition = em.find(Partition.class, 1L);
+		if (partition == null) {
+			partition = new Partition();
+			partition.setId(1L);
+			partition.setName("default");
+			partition.setDescription("Default Partition");
+		}
 		return partition;
 	}
 }

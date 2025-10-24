@@ -91,15 +91,13 @@ public class TimeSeries {
 		}
 	}
 
-	@ManyToOne(optional = false)
+	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
 	private Partition partition;
 
 	public TimeSeries() {
-		this.partition = Partition.DEFAULT;
 	}
 
 	public TimeSeries(Station station, DataType type, Integer period, ValueTable valueTable) {
-		this.partition = Partition.DEFAULT;
 		this.station = station;
 		this.type = type;
 		this.period = period;
@@ -476,6 +474,7 @@ public class TimeSeries {
 			
 			if (timeseries == null) {
 				timeseries = new TimeSeries(station, type, period, table);
+				timeseries.setPartition(Partition.getDefault(em));
 			}
 		}
 
