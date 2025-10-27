@@ -46,16 +46,79 @@ select station_id, type_id, period, 'measurementjson' from measurementjson
 union select distinct station_id, type_id, period, 'measurementjson' from measurementjsonhistory ;
 
 -- set session parameters
-set work_mem='500MB';
-set maintenance_work_mem='7GB';
+set search_path=intimev2,public;
+SET work_mem = '10GB';
+SET maintenance_work_mem = '20GB';
+SET max_parallel_workers_per_gather = 4;
+SET synchronous_commit = OFF;
 
 -- STRING history
-alter table measurementstringhistory add column
-timeseries_id int4;
-alter table measurementstringhistory add column
-partition_id int2 not null default 1;
+alter table measurementstringhistory add column timeseries_id int4;
+alter table measurementstringhistory add column partition_id int2 not null default 1;
 alter table measurementstringhistory add constraint fk_measurementstringhistory_timeseries foreign key (timeseries_id) references timeseries(id);
 alter table measurementstringhistory add constraint fk_measurementstringhistory_partition foreign key (partition_id) references "partition"(id);
+
+alter table measurementstringhistory drop constraint measurementstringhistory_pkey;
+drop index measurementstringhistory_pkey; 
+
+DO $$
+DECLARE
+    rows_affected INTEGER;
+    total_updated INTEGER := 0;
+    iteration INTEGER := 1;
+    batch_size INTEGER := 1000000;
+    last_ctid tid;
+    max_ctid tid;
+BEGIN
+    -- Get the maximum ctid to know when to stop
+    SELECT max(ctid) INTO max_ctid FROM measurementstringhistory;
+    last_ctid := '(0,0)'::tid;
+    
+    RAISE NOTICE 'Starting batch update process...';
+    RAISE NOTICE 'Batch size: %', batch_size;
+    
+    LOOP
+        RAISE NOTICE '----------------------------------------';
+        RAISE NOTICE 'Iteration % - %', iteration, clock_timestamp();
+        
+        -- Update next batch based on ctid range
+        WITH updated AS (
+            UPDATE measurementstringhistory h
+            SET timeseries_id = t.id, partition_id = 1
+            FROM timeseries t
+            WHERE t.station_id = h.station_id
+              AND t.type_id = h.type_id
+              AND t.period = h.period
+              AND t.value_table = 'measurementstring'
+              AND h.timeseries_id IS NULL
+              AND h.ctid > last_ctid
+              AND h.ctid <= (
+                SELECT ctid FROM measurementstringhistory 
+                WHERE ctid > last_ctid 
+                ORDER BY ctid 
+                LIMIT 1 OFFSET batch_size
+              )
+            RETURNING h.ctid
+        )
+        SELECT COUNT(*), MAX(ctid) INTO rows_affected, last_ctid FROM updated;
+        
+        total_updated := total_updated + rows_affected;
+        
+        RAISE NOTICE 'Rows processed in range, updated: %', rows_affected;
+        RAISE NOTICE 'Total updated so far: %', total_updated;
+        RAISE NOTICE 'Last ctid: %', last_ctid;
+        
+        -- Exit if we've passed the max ctid or no progress
+        EXIT WHEN last_ctid >= max_ctid OR last_ctid IS NULL;
+        
+        iteration := iteration + 1;
+        COMMIT;
+        
+    END LOOP;
+    
+    RAISE NOTICE '----------------------------------------';
+    RAISE NOTICE 'Update complete! Total rows updated: %', total_updated;
+END $$;
 
 update measurementstringhistory h
 set timeseries_id = t.id, partition_id = 1
@@ -63,9 +126,10 @@ from timeseries t
 where t.station_id = h.station_id 
 and t.type_id = h.type_id 
 and t.period = h."period" 
-and t.value_table = 'measurementstring';
+and t.value_table = 'measurementstring'
+and h.timeseries_id is null;
 
-create index idx_measurementstringhistory_timeseries_ts on measurementstringhistory (timeseries_id, timestamp);
+create unique index uc_measurementstringhistory_timeseries_ts on measurementstringhistory (timeseries_id, timestamp);
 alter table measurementstringhistory alter column timeseries_id set not null;
 
 alter table measurementstringhistory drop column id;
@@ -85,15 +149,78 @@ partition_id int2 not null default 1;
 alter table measurementhistory add constraint fk_measurementhistory_timeseries foreign key (timeseries_id) references timeseries(id);
 alter table measurementhistory add constraint fk_measurementhistory_partition foreign key (partition_id) references "partition"(id);
 
+alter table measurementhistory drop constraint measurementhistory_pkey;
+drop index measurementhistory_pkey; 
+
+DO $$
+DECLARE
+    rows_affected INTEGER;
+    total_updated INTEGER := 0;
+    iteration INTEGER := 1;
+    batch_size INTEGER := 1000000;
+    last_ctid tid;
+    max_ctid tid;
+BEGIN
+    -- Get the maximum ctid to know when to stop
+    SELECT max(ctid) INTO max_ctid FROM measurementhistory;
+    last_ctid := '(0,0)'::tid;
+    
+    RAISE NOTICE 'Starting batch update process...';
+    RAISE NOTICE 'Batch size: %', batch_size;
+    
+    LOOP
+        RAISE NOTICE '----------------------------------------';
+        RAISE NOTICE 'Iteration % - %', iteration, clock_timestamp();
+        
+        -- Update next batch based on ctid range
+        WITH updated AS (
+            UPDATE measurementhistory h
+            SET timeseries_id = t.id, partition_id = 1
+            FROM timeseries t
+            WHERE t.station_id = h.station_id
+              AND t.type_id = h.type_id
+              AND t.period = h.period
+              AND t.value_table = 'measurement'
+              AND h.timeseries_id IS NULL
+              AND h.ctid > last_ctid
+              AND h.ctid <= (
+                SELECT ctid FROM measurementhistory 
+                WHERE ctid > last_ctid 
+                ORDER BY ctid 
+                LIMIT 1 OFFSET batch_size
+              )
+            RETURNING h.ctid
+        )
+        SELECT COUNT(*), MAX(ctid) INTO rows_affected, last_ctid FROM updated;
+        
+        total_updated := total_updated + rows_affected;
+        
+        RAISE NOTICE 'Rows processed in range, updated: %', rows_affected;
+        RAISE NOTICE 'Total updated so far: %', total_updated;
+        RAISE NOTICE 'Last ctid: %', last_ctid;
+        
+        -- Exit if we've passed the max ctid or no progress
+        EXIT WHEN last_ctid >= max_ctid OR last_ctid IS NULL;
+        
+        iteration := iteration + 1;
+        COMMIT;
+        
+    END LOOP;
+    
+    RAISE NOTICE '----------------------------------------';
+    RAISE NOTICE 'Update complete! Total rows updated: %', total_updated;
+END $$;
+
 update measurementhistory h
 set timeseries_id = t.id, partition_id = 1
 from timeseries t
 where t.station_id = h.station_id 
 and t.type_id = h.type_id 
 and t.period = h."period" 
-and t.value_table = 'measurement';
+and t.value_table = 'measurement'
+and h.timeseries_id is null;
 
-create index idx_measurementhistory_timeseries_ts on measurementhistory (timeseries_id, timestamp);
+create unique index uc_measurementhistory_timeseries_ts on measurementhistory (timeseries_id, timestamp);
 alter table measurementhistory alter column timeseries_id set not null;
 
 alter table measurementhistory drop column id;
@@ -112,6 +239,9 @@ partition_id int2 not null default 1;
 alter table measurementjsonhistory add constraint fk_measurementjsonhistory_timeseries foreign key (timeseries_id) references timeseries(id);
 alter table measurementjsonhistory add constraint fk_measurementjsonhistory_partition foreign key (partition_id) references "partition"(id);
 
+alter table measurementhistory drop constraint measurementhistory_pkey;
+drop index measurementhistory_pkey; 
+
 update measurementjsonhistory h
 set timeseries_id = t.id, partition_id = 1
 from timeseries t
@@ -120,7 +250,7 @@ and t.type_id = h.type_id
 and t.period = h."period" 
 and t.value_table = 'measurementjson';
 
-create index idx_measurementjsonhistory_timeseries_ts on measurementjsonhistory (timeseries_id, timestamp);
+create unique index uc_measurementjsonhistory_timeseries_ts on measurementjsonhistory (timeseries_id, timestamp);
 alter table measurementjsonhistory alter column timeseries_id set not null;
 
 alter table measurementjsonhistory drop column id;
