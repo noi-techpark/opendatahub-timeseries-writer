@@ -37,6 +37,8 @@ create table  timeseries (
 create index idx_timeseries_station on timeseries(station_id);
 create index idx_timeseries_type on timeseries(type_id);
 
+grant select on timeseries, partition to bdp_readonly;
+
 insert into timeseries (station_id, type_id, period, value_table) 
 select station_id, type_id, period, 'measurement' from measurement
 union select distinct station_id, type_id, period, 'measurement' from measurementhistory ;
