@@ -19,14 +19,20 @@ ALTER TABLE measurementhistory
 -- create and validate separately to avoid exclusive locks
 alter table measurementhistory validate constraint ck_measurementhistory_part_1;
 
--- TODO: create partition main table part_measurementhistory as exact clone of measurementhistory
--- TODO
--- TODO
--- TODO
--- TODO
--- TODO
--- TODO
--- TODO
+-- create partition main table part_measurementhistory as exact clone of measurementhistory
+-- pg_dump -U bdp -W -h partition.czracduepxal.eu-west-1.rds.amazonaws.com -d bdp -t intimev2.measurementhistory --schema-only
+CREATE TABLE intimev2.part_measurementhistory (
+	created_on timestamp NOT NULL,
+	"timestamp" timestamp NOT NULL,
+	double_value float8 NOT NULL,
+	provenance_id int8 NULL,
+	timeseries_id int4 NULL,
+	partition_id int2 DEFAULT 1 NOT NULL,
+	CONSTRAINT fk_part_measurementhistory_partition FOREIGN KEY (partition_id) REFERENCES intimev2."partition"(id),
+	CONSTRAINT fk_part_measurementhistory_provenance_id_provenance_pk FOREIGN KEY (provenance_id) REFERENCES intimev2.provenance(id),
+	CONSTRAINT fk_part_measurementhistory_timeseries FOREIGN KEY (timeseries_id) REFERENCES intimev2.timeseries(id)
+);
+CREATE INDEX idx_part_measurementhistory_timeseries_ts ON intimev2.part_measurementhistory USING btree (timeseries_id, "timestamp");
 
 -- attach original table as partition for value = default partition
 alter table measurementhistory attach partition part_measurementhistory for values in (1);
