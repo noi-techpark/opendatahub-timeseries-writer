@@ -301,3 +301,5 @@ vacuum full measurement;
 vacuum full measurementhistory;
 
 vacuum full station;
+
+cluster measurementhistory using idx_measurementhistory_timeseries_ts;
