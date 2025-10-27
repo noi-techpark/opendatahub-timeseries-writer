@@ -66,9 +66,9 @@ and t.type_id = h.type_id
 and t.period = h."period" 
 and t.value_table = 'measurementstring';
 
-create index idx_measurementstring_timeseries_ts on measurementstring (timeseries_id);
+create unique index idx_measurementstring_timeseries_ts on measurementstring (timeseries_id);
 alter table measurementstring alter column timeseries_id set not null;
-create index idx_measurementstringhistory_timeseries_ts on measurementstringhistory (timeseries_id, timestamp);
+create unique index idx_measurementstringhistory_timeseries_ts on measurementstringhistory (timeseries_id, timestamp);
 alter table measurementstringhistory alter column timeseries_id set not null;
 
 alter table measurementstring drop column id;
@@ -104,9 +104,9 @@ and t.type_id = h.type_id
 and t.period = h."period" 
 and t.value_table = 'measurementjson';
 
-create index idx_measurementjson_timeseries_ts on measurementjson (timeseries_id);
+create unique index idx_measurementjson_timeseries_ts on measurementjson (timeseries_id);
 alter table measurementjson alter column timeseries_id set not null;
-create index idx_measurementjsonhistory_timeseries_ts on measurementjsonhistory (timeseries_id, timestamp);
+create unique index idx_measurementjsonhistory_timeseries_ts on measurementjsonhistory (timeseries_id, timestamp);
 alter table measurementjsonhistory alter column timeseries_id set not null;
 
 alter table measurementjson drop column id;
@@ -142,9 +142,9 @@ and t.type_id = h.type_id
 and t.period = h."period" 
 and t.value_table = 'measurement';
 
-create index idx_measurement_timeseries_ts on measurement (timeseries_id);
+create unique index idx_measurement_timeseries_ts on measurement (timeseries_id);
 alter table measurement alter column timeseries_id set not null;
-create index idx_measurementhistory_timeseries_ts on measurementhistory (timeseries_id, timestamp);
+create unique index idx_measurementhistory_timeseries_ts on measurementhistory (timeseries_id, timestamp);
 alter table measurementhistory alter column timeseries_id set not null;
 
 alter table measurement drop column id;
