@@ -8,8 +8,6 @@ set search_path=intimev2,public;
 SET work_mem = '10GB';
 SET maintenance_work_mem = '20GB';
 SET max_parallel_workers_per_gather = 4;
-SET synchronous_commit = OFF;
-
 
 -- create check constraint corresponding to the partition key, so that during attachment now (exclusive lock) validation has to be done
 ALTER TABLE measurementhistory 
@@ -35,6 +33,8 @@ CREATE TABLE part_measurementhistory (
 ) partition by list (partition_id);
 CREATE INDEX idx_part_measurementhistory_timeseries_ts ON intimev2.part_measurementhistory USING btree (timeseries_id, "timestamp");
 
+grant select on measurementhistory to bdp_readonly;
+
 -- attach original table as partition for value = default partition
 alter table part_measurementhistory attach partition measurementhistory for values in (1);
 
@@ -43,20 +43,14 @@ alter table measurementhistory drop constraint ck_measurementhistory_part_1;
 
 -- switch the names around
 alter table measurementhistory rename to measurementhistory_1;
-alter table measurementhistory_1 rename constraint fk_measurementhistory_partition to fk_measurementhistory_1_partition;
-alter table measurementhistory_1 rename constraint fk_measurementhistory_provenance_id_provenance_pk to fk_measurementhistory_1_provenance_id_provenance_pk;
-alter table measurementhistory_1 rename constraint fk_measurementhistory_timeseries to fk_measurementhistory_1_timeseries;
-alter index idx_measurementhistory_timeseries_ts rename to idx_measurementhistory_1_timeseries_ts;
 alter table part_measurementhistory rename to measurementhistory;
+
+-- normalize indexes and foreign key names 
+-- note: foreign key names stay the same throughout all partitions, they are not unique, hence not renaming the partition's FKs
+-- index name corresponds to what is created automatically when creating a new partition
+alter index idx_measurementhistory_timeseries_ts rename to measurementhistory_1_timeseries_id_timestamp_idx;
 alter table measurementhistory rename constraint fk_part_measurementhistory_partition to fk_measurementhistory_partition;
 alter table measurementhistory rename constraint fk_part_measurementhistory_provenance_id_provenance_pk to fk_measurementhistory_provenance_id_provenance_pk;
 alter table measurementhistory rename constraint fk_part_measurementhistory_timeseries to fk_measurementhistory_timeseries;
 alter index idx_part_measurementhistory_timeseries_ts rename to idx_measurementhistory_timeseries_ts;
-
-
-
-
--- TODO: rename all the indexes and constraints accordingly
-
-
 
