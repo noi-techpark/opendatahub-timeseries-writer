@@ -19,9 +19,10 @@ ALTER TABLE measurementhistory
 -- create and validate separately to avoid exclusive locks
 alter table measurementhistory validate constraint ck_measurementhistory_part_1;
 
+--drop table part_measurementhistory;
 -- create partition main table part_measurementhistory as exact clone of measurementhistory
 -- pg_dump -U bdp -W -h partition.czracduepxal.eu-west-1.rds.amazonaws.com -d bdp -t intimev2.measurementhistory --schema-only
-CREATE TABLE intimev2.part_measurementhistory (
+CREATE TABLE part_measurementhistory (
 	created_on timestamp NOT NULL,
 	"timestamp" timestamp NOT NULL,
 	double_value float8 NOT NULL,
@@ -31,18 +32,29 @@ CREATE TABLE intimev2.part_measurementhistory (
 	CONSTRAINT fk_part_measurementhistory_partition FOREIGN KEY (partition_id) REFERENCES intimev2."partition"(id),
 	CONSTRAINT fk_part_measurementhistory_provenance_id_provenance_pk FOREIGN KEY (provenance_id) REFERENCES intimev2.provenance(id),
 	CONSTRAINT fk_part_measurementhistory_timeseries FOREIGN KEY (timeseries_id) REFERENCES intimev2.timeseries(id)
-);
+) partition by list (partition_id);
 CREATE INDEX idx_part_measurementhistory_timeseries_ts ON intimev2.part_measurementhistory USING btree (timeseries_id, "timestamp");
 
 -- attach original table as partition for value = default partition
-alter table measurementhistory attach partition part_measurementhistory for values in (1);
+alter table part_measurementhistory attach partition measurementhistory for values in (1);
 
 -- drop redundant constraint
 alter table measurementhistory drop constraint ck_measurementhistory_part_1;
 
 -- switch the names around
 alter table measurementhistory rename to measurementhistory_1;
-alter table part_measurementhistory to measurementhistory;
+alter table measurementhistory_1 rename constraint fk_measurementhistory_partition to fk_measurementhistory_1_partition;
+alter table measurementhistory_1 rename constraint fk_measurementhistory_provenance_id_provenance_pk to fk_measurementhistory_1_provenance_id_provenance_pk;
+alter table measurementhistory_1 rename constraint fk_measurementhistory_timeseries to fk_measurementhistory_1_timeseries;
+alter index idx_measurementhistory_timeseries_ts rename to idx_measurementhistory_1_timeseries_ts;
+alter table part_measurementhistory rename to measurementhistory;
+alter table measurementhistory rename constraint fk_part_measurementhistory_partition to fk_measurementhistory_partition;
+alter table measurementhistory rename constraint fk_part_measurementhistory_provenance_id_provenance_pk to fk_measurementhistory_provenance_id_provenance_pk;
+alter table measurementhistory rename constraint fk_part_measurementhistory_timeseries to fk_measurementhistory_timeseries;
+alter index idx_part_measurementhistory_timeseries_ts rename to idx_measurementhistory_timeseries_ts;
+
+
+
 
 -- TODO: rename all the indexes and constraints accordingly
 
