@@ -8,7 +8,7 @@ SET work_mem = '10GB';
 SET maintenance_work_mem = '20GB';
 SET max_parallel_workers_per_gather = 4;
 SET synchronous_commit = OFF;
-set search_path to ${default_schema}, public;
+
 -- create new tables
 create sequence partition_seq start 1 increment 1;
 create table "partition" (
@@ -302,4 +302,4 @@ vacuum full measurementhistory;
 
 vacuum full station;
 
-cluster measurementhistory using idx_measurementhistory_timeseries_ts;
+--cluster measurementhistory using idx_measurementhistory_timeseries_ts;
