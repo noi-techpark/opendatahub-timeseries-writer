@@ -36,6 +36,8 @@ import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Measurement;
 import com.opendatahub.timeseries.bdp.writer.dal.MeasurementAbstract;
+import com.opendatahub.timeseries.bdp.writer.dal.Partition;
+import com.opendatahub.timeseries.bdp.writer.dal.PartitionDef;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.writer.Application;
 
@@ -204,5 +206,24 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		assertEquals(7, qResult.intValue());
 	}
+	
+	@Test
+	public void testPartitionDef(){
+		em.persist(new PartitionDef(partition, "or1", null, null, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", null, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", type, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", type, 100));
+		var part2 = new Partition("part2", "part2");
+		em.persist(new PartitionDef(part2, "or2", "s1", type, 100));
+		var part3 = new Partition("part3", "part3");
+		em.persist(new PartitionDef(part3, "or3", "s1", null, null));
+		em.persist(new PartitionDef(part3, "or3", null, type, null));
+		
+		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, null));
+		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, 100));
+		assertNotNull(PartitionDef.findPartition(em, "or2",null, null, 100));
 
+		assertNotNull(PartitionDef.findPartition(em, "or1",null, null, 100));
+		assertNotNull(PartitionDef.findPartition(em, "or1",null, type, null));
+	}
 }

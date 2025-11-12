@@ -107,4 +107,9 @@ public class Partition {
 					.forEach(table -> partition.createPartition(entityManager, table));
 		}
 	}
+
+	public Partition(String name, String description) {
+		this.name = name;
+		this.description = description;
+	}
 }

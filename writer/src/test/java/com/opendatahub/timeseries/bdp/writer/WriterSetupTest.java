@@ -14,6 +14,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.query.parser.Part;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -27,6 +28,7 @@ import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Measurement;
+import com.opendatahub.timeseries.bdp.writer.dal.Partition;
 import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.dal.TimeSeries;
@@ -62,12 +64,16 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
     protected Measurement measurement;
     protected Measurement measurementOld;
     protected Provenance provenance;
+    protected Partition partition;
 
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             DockerImageName.parse("postgis/postgis:16-3.5-alpine").asCompatibleSubstituteFor("postgres"));
 
     @BeforeAll
     static void startPG() {
+        // temp workaround until testcontainers is fixed
+        // https://github.com/testcontainers/testcontainers-java/issues/11212#issuecomment-3516573631
+        System.setProperty("api.version", "1.44");
         postgres.start();
     }
 
@@ -90,6 +96,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
         cleanup();
 
         em = entityManagerFactory.createEntityManager();
+        partition = Partition.getDefault(em);
 
         station = new Station(STATION_TYPE, "Station01", "Station One");
         type = new DataType("NO2", "mg", "Fake type", "Instants");
@@ -117,6 +124,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
 
         try {
             em.getTransaction().begin();
+            em.persist(partition);
             em.persist(station);
             em.persist(type);
             em.persist(provenance);
