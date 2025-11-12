@@ -1,0 +1,28 @@
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: bdp.partition.dev.testingmachine.eu
+      paths:
+        - path: "/"
+          pathType: Prefix
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+
+env:
+  SECURITY_ALLOWED_ORIGINS: "*"
+  KEYCLOAK_URL: https://auth.opendatahub.testingmachine.eu/auth
+  KEYCLOAK_SSL_REQUIRED: none
+  KEYCLOAK_REALM: noi
+  KEYCLOAK_CLIENT_ID: odh-mobility-writer
+  LOG_LEVEL: INFO
+  LOG_STYLE: json
+  LOG_APPLICATION_NAME: writer
+  HIBERNATE_SQL_LOG: false
+  HIBERNATE_LOG_LEVEL: WARN
+  HIBERNATE_MAX_POOL_SIZE: 30
+  HIKARI_LEAK_DETECTION_THRESHOLD: 20000
+  ACTUATOR_ENABLE_METRICS: "true"
+
+database:
+  servicebindName: "postgres-readwrite-svcbind"
