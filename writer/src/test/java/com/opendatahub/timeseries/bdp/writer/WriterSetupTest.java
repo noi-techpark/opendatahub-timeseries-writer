@@ -96,7 +96,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
         cleanup();
 
         em = entityManagerFactory.createEntityManager();
-        partition = new Partition("default", "Default Partition");
+        partition = Partition.getDefault(em);
 
         station = new Station(STATION_TYPE, "Station01", "Station One");
         type = new DataType("NO2", "mg", "Fake type", "Instants");
@@ -124,7 +124,6 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
 
         try {
             em.getTransaction().begin();
-            em.persist(partition);
             em.persist(station);
             em.persist(type);
             em.persist(provenance);
@@ -158,7 +157,6 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
             em.createQuery("DELETE FROM MeasurementJSONHistory").executeUpdate();
             em.createQuery("DELETE FROM TimeSeries").executeUpdate();
             em.createQuery("DELETE FROM PartitionDef").executeUpdate();
-            em.createQuery("DELETE FROM Partition").executeUpdate();
             em.createQuery("DELETE FROM Event").executeUpdate();
             em.createQuery("UPDATE Station SET metaData = NULL").executeUpdate();
             em.createQuery("DELETE FROM MetaData").executeUpdate();

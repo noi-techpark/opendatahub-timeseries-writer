@@ -230,7 +230,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		// should find, because matches exactly
 		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, 100));
 
-		assertNotNull(PartitionDef.findPartition(em, "or1",null, null, 100));
-		assertNotNull(PartitionDef.findPartition(em, "or1",null, type, null));
+		assertNotNull(PartitionDef.findPartition(em, "or1","s1", type, 100));
+		assertNotNull(PartitionDef.findPartition(em, "or1","s1", type, null));
 	}
 }

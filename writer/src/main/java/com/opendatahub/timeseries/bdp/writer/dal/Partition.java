@@ -69,11 +69,10 @@ public class Partition {
 		this.description = description;
 	}
 
-	public static Partition getDefault(EntityManager em) {
+	public static synchronized Partition getDefault(EntityManager em) {
 		Partition partition = em.find(Partition.class, 1L);
 		if (partition == null) {
 			partition = new Partition("default", "Default Partition");
-			partition.setId(1L);
 		}
 		return partition;
 	}
