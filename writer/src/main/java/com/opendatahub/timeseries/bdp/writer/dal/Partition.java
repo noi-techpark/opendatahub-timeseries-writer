@@ -5,10 +5,8 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
-import java.util.List;
-
 import org.hibernate.annotations.ColumnDefault;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Bean;
 
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.Column;
@@ -19,8 +17,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.PostPersist;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -35,7 +31,6 @@ import jakarta.persistence.UniqueConstraint;
 		@UniqueConstraint(columnNames = { "name" })
 })
 @Cacheable
-@EntityListeners(Partition.PartitionCreatorListener.class)
 public class Partition {
 
 	@Id
@@ -77,10 +72,8 @@ public class Partition {
 	public static Partition getDefault(EntityManager em) {
 		Partition partition = em.find(Partition.class, 1L);
 		if (partition == null) {
-			partition = new Partition();
+			partition = new Partition("default", "Default Partition");
 			partition.setId(1L);
-			partition.setName("default");
-			partition.setDescription("Default Partition");
 		}
 		return partition;
 	}
@@ -91,22 +84,7 @@ public class Partition {
 		em.createNativeQuery(ddl1).executeUpdate();
 	}
 
-	/**
-	 * After persisting the partition record, create the corresponding partitions on
-	 * history tables
-	 */
-	@Component
-	public static class PartitionCreatorListener {
-
-		@PersistenceContext
-		private EntityManager entityManager;
-
-		@PostPersist
-		public void createPartitions(Partition partition) {
-			List.of("measurementhistory", "measurementstringhistory", "measurementjsonhistory").stream()
-					.forEach(table -> partition.createPartition(entityManager, table));
-		}
-	}
+	public Partition(){}
 
 	public Partition(String name, String description) {
 		this.name = name;

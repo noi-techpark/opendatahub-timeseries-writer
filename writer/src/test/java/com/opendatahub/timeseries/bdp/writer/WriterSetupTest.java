@@ -96,7 +96,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
         cleanup();
 
         em = entityManagerFactory.createEntityManager();
-        partition = Partition.getDefault(em);
+        partition = new Partition("default", "Default Partition");
 
         station = new Station(STATION_TYPE, "Station01", "Station One");
         type = new DataType("NO2", "mg", "Fake type", "Instants");
@@ -142,37 +142,39 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
             throw e;
         }
     }
-@AfterEach
-public void cleanup() {
-    em = entityManagerFactory.createEntityManager();
-    try {
-        em.getTransaction().begin();
-        
-        // Delete all measurements (all types)
-        em.createQuery("DELETE FROM Measurement").executeUpdate();
-        em.createQuery("DELETE FROM MeasurementHistory").executeUpdate();
-        em.createQuery("DELETE FROM MeasurementString").executeUpdate();
-        em.createQuery("DELETE FROM MeasurementStringHistory").executeUpdate();
-        em.createQuery("DELETE FROM MeasurementJSON").executeUpdate();
-        em.createQuery("DELETE FROM MeasurementJSONHistory").executeUpdate();
-        em.createQuery("DELETE FROM TimeSeries").executeUpdate();
-        // em.createQuery("DELETE FROM Partition").executeUpdate();
-        em.createQuery("DELETE FROM Event").executeUpdate();
-        em.createQuery("UPDATE Station SET metaData = NULL").executeUpdate();
-        em.createQuery("DELETE FROM MetaData").executeUpdate();
-        em.createQuery("DELETE FROM Station").executeUpdate();
-        em.createQuery("DELETE FROM DataType").executeUpdate();
-        em.createQuery("DELETE FROM Provenance").executeUpdate();
-        
-        em.getTransaction().commit();
-    } catch (Exception e) {
-        em.getTransaction().rollback();
-        throw e;
-    } finally {
-        if (em.isOpen()) {
-            em.clear();
-            em.close();
+
+    @AfterEach
+    public void cleanup() {
+        em = entityManagerFactory.createEntityManager();
+        try {
+            em.getTransaction().begin();
+
+            // Delete all measurements (all types)
+            em.createQuery("DELETE FROM Measurement").executeUpdate();
+            em.createQuery("DELETE FROM MeasurementHistory").executeUpdate();
+            em.createQuery("DELETE FROM MeasurementString").executeUpdate();
+            em.createQuery("DELETE FROM MeasurementStringHistory").executeUpdate();
+            em.createQuery("DELETE FROM MeasurementJSON").executeUpdate();
+            em.createQuery("DELETE FROM MeasurementJSONHistory").executeUpdate();
+            em.createQuery("DELETE FROM TimeSeries").executeUpdate();
+            em.createQuery("DELETE FROM PartitionDef").executeUpdate();
+            em.createQuery("DELETE FROM Partition").executeUpdate();
+            em.createQuery("DELETE FROM Event").executeUpdate();
+            em.createQuery("UPDATE Station SET metaData = NULL").executeUpdate();
+            em.createQuery("DELETE FROM MetaData").executeUpdate();
+            em.createQuery("DELETE FROM Station").executeUpdate();
+            em.createQuery("DELETE FROM DataType").executeUpdate();
+            em.createQuery("DELETE FROM Provenance").executeUpdate();
+
+            em.getTransaction().commit();
+        } catch (Exception e) {
+            em.getTransaction().rollback();
+            throw e;
+        } finally {
+            if (em.isOpen()) {
+                em.clear();
+                em.close();
+            }
         }
     }
-}
 }

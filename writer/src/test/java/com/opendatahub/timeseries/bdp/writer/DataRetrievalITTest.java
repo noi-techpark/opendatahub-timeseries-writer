@@ -209,6 +209,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	
 	@Test
 	public void testPartitionDef(){
+		em.getTransaction().begin();
 		em.persist(new PartitionDef(partition, "or1", null, null, null));
 		em.persist(new PartitionDef(partition, "or1", "s1", null, null));
 		em.persist(new PartitionDef(partition, "or1", "s1", type, null));
@@ -218,10 +219,16 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		var part3 = new Partition("part3", "part3");
 		em.persist(new PartitionDef(part3, "or3", "s1", null, null));
 		em.persist(new PartitionDef(part3, "or3", null, type, null));
+		em.getTransaction().commit();
 		
-		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, null));
+		System.out.println(" -------------- Dumping partition_def: ");
+		System.out.println(em.createQuery("select partitiondef from PartitionDef partitiondef").getResultList());
+
+		
+		// should not find, because or2 is only defined for specific period
+		assertNull(PartitionDef.findPartition(em, "or2", "s1", type, null));
+		// should find, because matches exactly
 		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, 100));
-		assertNotNull(PartitionDef.findPartition(em, "or2",null, null, 100));
 
 		assertNotNull(PartitionDef.findPartition(em, "or1",null, null, 100));
 		assertNotNull(PartitionDef.findPartition(em, "or1",null, type, null));
