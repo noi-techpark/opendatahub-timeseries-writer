@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 NOI Techpark <digital@noi.bz.it>
+#
+# SPDX-License-Identifier: CC0-1.0
+
 # Check arguments
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <basepath> <csv_file>"
