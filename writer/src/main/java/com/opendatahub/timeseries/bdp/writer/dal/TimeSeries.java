@@ -4,19 +4,15 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
-import static org.mockito.Answers.values;
-
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 import org.hibernate.annotations.ColumnDefault;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JacksonInject.Value;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
@@ -91,7 +87,7 @@ public class TimeSeries {
 			this.historyClass = historyClass;
 		}
 
-		public static ValueTable getByTable(String s){
+		public static ValueTable getByTable(String s) {
 			for (ValueTable v : values()) {
 				if (v.table.equals(s)) {
 					return v;
@@ -102,17 +98,17 @@ public class TimeSeries {
 	}
 
 	@Converter
-    public static class ValueTableConverter implements AttributeConverter<ValueTable, String> {
-        @Override
-        public String convertToDatabaseColumn(ValueTable vt) {
-            return vt == null ? null : vt.table;
-        }
-        
-        @Override
-        public ValueTable convertToEntityAttribute(String dbData) {
+	public static class ValueTableConverter implements AttributeConverter<ValueTable, String> {
+		@Override
+		public String convertToDatabaseColumn(ValueTable vt) {
+			return vt == null ? null : vt.table;
+		}
+
+		@Override
+		public ValueTable convertToEntityAttribute(String dbData) {
 			return ValueTable.getByTable(dbData);
 		}
-    }
+	}
 
 	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
 	private Partition partition;
@@ -166,20 +162,21 @@ public class TimeSeries {
 	public void setPartition(Partition partition) {
 		this.partition = partition;
 	}
-	
-	public ValueTable getValueTable () {
+
+	public ValueTable getValueTable() {
 		return value_table;
 	}
-	
+
 	public void setValueTable(ValueTable valueTable) {
 		this.value_table = valueTable;
 	}
 
-	public static TimeSeries findTimeSeries(EntityManager em, Station station, DataType dataType, Integer period, ValueTable valueTable) {
+	public static TimeSeries findTimeSeries(EntityManager em, Station station, DataType dataType, Integer period,
+			ValueTable valueTable) {
 		return QueryBuilder
 				.init(em)
 				.addSql("SELECT ts FROM TimeSeries ts")
-				.addSql( "WHERE ts.station = :station")
+				.addSql("WHERE ts.station = :station")
 				.addSql("AND ts.type = :type")
 				.addSql("AND ts.value_table = :value_table")
 				.setParameter("station", station)
@@ -320,7 +317,7 @@ public class TimeSeries {
 				.addSql("ORDER BY record.timestamp DESC")
 				.buildSingleResultOrNull(table.getClass());
 	}
-	
+
 	/* A record, but wrapped deliciously */
 	private static class RecordBurrito extends SimpleRecordDto {
 		private ValueTable table;
@@ -342,7 +339,7 @@ public class TimeSeries {
 			return table;
 		}
 	}
-	
+
 	/**
 	 * <p>
 	 * persists all measurement data send to the writer from data collectors to the
@@ -380,7 +377,8 @@ public class TimeSeries {
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
 				Station station = Station.findStation(em, stationType, stationBranch.getKey());
 				if (station == null) {
-					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType, stationBranch.getKey()));
+					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType,
+							stationBranch.getKey()));
 					continue;
 				}
 				for (var typeBranch : stationBranch.getValue().getBranch().entrySet()) {
@@ -395,19 +393,21 @@ public class TimeSeries {
 							log.warn("Empty data set. Skipping...");
 							continue;
 						}
-						
+
 						// group records by datatype / period and sort by timestamp
-						// grouping to handle mixed value types (e.g. string/double) and periods within the same type
-						// timestamp sort to discard duplicate timestamps (because we compare against the running latest)
+						// grouping to handle mixed value types (e.g. string/double) and periods within
+						// the same type
+						// timestamp sort to discard duplicate timestamps (because we compare against
+						// the running latest)
 						var simpleRecords = dataRecords.stream()
-							.map((r) -> new RecordBurrito((SimpleRecordDto)r))
-							.sorted(Comparator.comparing(RecordBurrito::getTable)
-								.thenComparing(RecordBurrito::getPeriod)
-								.thenComparing(RecordBurrito::getTimestamp))
-							.toList();
+								.map((r) -> new RecordBurrito((SimpleRecordDto) r))
+								.sorted(Comparator.comparing(RecordBurrito::getTable)
+										.thenComparing(RecordBurrito::getPeriod)
+										.thenComparing(RecordBurrito::getTimestamp))
+								.toList();
 
 						em.getTransaction().begin();
-						
+
 						Series series = new Series(em, station, type, null, null);
 
 						for (RecordBurrito record : simpleRecords) {
@@ -427,7 +427,8 @@ public class TimeSeries {
 
 						em.getTransaction().commit();
 					} catch (Exception ex) {
-						log.error( String.format("Exception '%s'... Skipping this measurement branch!", ex.getMessage()), ex);
+						log.error(String.format("Exception '%s'... Skipping this measurement branch!", ex.getMessage()),
+								ex);
 						LOG.debug("Printing stack trace", ex);
 					} finally {
 						if (em.getTransaction().isActive()) {
@@ -438,7 +439,8 @@ public class TimeSeries {
 			}
 
 			if (skippedCount > 0) {
-				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]", skippedCount, stationType, String.join(", ", skippedDataTypes)));
+				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]", skippedCount,
+						stationType, String.join(", ", skippedDataTypes)));
 			}
 		} catch (Exception e) {
 			throw JPAException.unnest(e);
@@ -451,7 +453,7 @@ public class TimeSeries {
 				em.close();
 		}
 	}
-	
+
 	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp) {
 		try {
 			MeasurementAbstractHistory rec = value_table.historyClass.getDeclaredConstructor().newInstance();
@@ -484,17 +486,18 @@ public class TimeSeries {
 		private long newestTime;
 		private RecordDtoImpl newest;
 		private TimeSeries timeseries;
-		
+
 		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
-			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period && table == timeseries.getValueTable();
+			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period
+					&& table == timeseries.getValueTable();
 		}
-		
+
 		public Series(EntityManager em, Station station, DataType type, Integer period, ValueTable table) {
 			timeseries = TimeSeries.findTimeSeries(em, station, type, period, table);
 			latest = (timeseries != null) ? timeseries.findLatestEntry(em) : null;
 			newestTime = (latest != null) ? latest.getTimestamp().getTime() : 0;
 			newest = null;
-			
+
 			if (timeseries == null) {
 				timeseries = new TimeSeries(station, type, period, table);
 				timeseries.setPartition(Partition.getDefault(em));
@@ -512,13 +515,15 @@ public class TimeSeries {
 			// In case of duplicates within a single push, which one is written and which
 			// one is discarded, is undefined (depends on the record sorting above)
 			if (newestTime < dto.getTimestamp()) {
-				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(), new Date(dto.getTimestamp()));
+				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
+						new Date(dto.getTimestamp()));
 				rec.setProvenance(provenance);
 				em.persist(rec);
 				updateNewest(dto);
 			} else {
 				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
-						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(), timeseries.period, dto.getTimestamp()));
+						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
+						timeseries.period, dto.getTimestamp()));
 				skippedCount++;
 			}
 		}
