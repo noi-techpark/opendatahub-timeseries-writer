@@ -4,15 +4,19 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
+import static org.mockito.Answers.values;
+
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.hibernate.annotations.ColumnDefault;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.annotation.JacksonInject.Value;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
@@ -20,8 +24,11 @@ import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
 
+import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EnumType;
@@ -65,31 +72,47 @@ public class TimeSeries {
 
 	@Column(nullable = false)
 	@Enumerated(EnumType.STRING)
+	@Convert(converter = ValueTableConverter.class)
 	private ValueTable value_table;
-	
-	public static enum ValueTable {
-		NUMBER("Measurement", Measurement.class, MeasurementHistory.class),
-		STRING("MeasurementString", MeasurementString.class, MeasurementStringHistory.class),
-		JSON("MeasurementJSON", MeasurementJSON.class, MeasurementJSONHistory.class);
 
-		private final String table;
-		private final Class<? extends MeasurementAbstract> latestClass;
-		private final Class<? extends MeasurementAbstractHistory> historyClass;
-		
-		ValueTable(String table, Class<? extends MeasurementAbstract> latestClass, Class<? extends MeasurementAbstractHistory> historyClass) {
+	public static enum ValueTable {
+		NUMBER("measurement", Measurement.class, MeasurementHistory.class),
+		STRING("measurementstring", MeasurementString.class, MeasurementStringHistory.class),
+		JSON("measurementjson", MeasurementJSON.class, MeasurementJSONHistory.class);
+
+		public final String table;
+		public final Class<? extends MeasurementAbstract> latestClass;
+		public final Class<? extends MeasurementAbstractHistory> historyClass;
+
+		ValueTable(String table, Class<? extends MeasurementAbstract> latestClass,
+				Class<? extends MeasurementAbstractHistory> historyClass) {
 			this.table = table;
 			this.latestClass = latestClass;
 			this.historyClass = historyClass;
 		}
 
-		public String getTable() {
-			return table;
-		}
-		
-		public String getCode() {
-			return table;
+		public static ValueTable getByTable(String s){
+			for (ValueTable v : values()) {
+				if (v.table.equals(s)) {
+					return v;
+				}
+			}
+			throw new IllegalArgumentException("Unknown value: " + s);
 		}
 	}
+
+	@Converter
+    public static class ValueTableConverter implements AttributeConverter<ValueTable, String> {
+        @Override
+        public String convertToDatabaseColumn(ValueTable vt) {
+            return vt == null ? null : vt.table;
+        }
+        
+        @Override
+        public ValueTable convertToEntityAttribute(String dbData) {
+			return ValueTable.getByTable(dbData);
+		}
+    }
 
 	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
 	private Partition partition;
@@ -262,7 +285,7 @@ public class TimeSeries {
 	public MeasurementAbstract findLatestEntry(EntityManager em) {
 		return QueryBuilder
 				.init(em)
-				.addSql("SELECT record FROM " + value_table.getTable() + " record")
+				.addSql("SELECT record FROM " + value_table.latestClass.getName() + " record")
 				.addSql("JOIN record.timeseries ts")
 				.addSql("WHERE ts.station = :station")
 				.setParameter("station", station)
