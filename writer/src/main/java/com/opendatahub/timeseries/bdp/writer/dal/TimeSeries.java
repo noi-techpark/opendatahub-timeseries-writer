@@ -67,7 +67,6 @@ public class TimeSeries {
 	private Integer period;
 
 	@Column(nullable = false)
-	@Enumerated(EnumType.STRING)
 	@Convert(converter = ValueTableConverter.class)
 	private ValueTable value_table;
 
