@@ -61,10 +61,15 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r representation stationtype dataty
     # Build URL
     url="${BASEPATH}/${representation}/${stationtype}/${datatype}/${datefrom}/${dateto}"
     
+    
     # Add query parameters if present
     query="?select=mvalue"
-    [ -n "$where" ] && query="${query}&where=${where}"
+    [ -n "$where" ] && query="${query}&where=$(urlencode $where)"
     [ -n "$limit" ] && query="${query}&limit=${limit}"
+    
+    url="${url}${query}"
+    
+    echo Requesting $url
     
     # Execute request and capture metrics
     response=$(curl -s -w "%{http_code}\n%{time_total}\n%{size_download}" \
@@ -117,7 +122,7 @@ tail -n +2 "$CSV_FILE" | while IFS=',' read -r representation stationtype dataty
     elapsed=$(echo "$current_time - $start_total" | bc)
     
     # Clear previous output and print updated summary (8 lines)
-    printf "\033[9A\033[J"
+    # printf "\033[9A\033[J"
     echo "=== Benchmark Progress ==="
     echo "Processed: $count requests"
     echo "Failed: $errors"
@@ -131,17 +136,5 @@ done
 end_total=$(date +%s.%N)
 wall_time=$(echo "$end_total - $start_total" | bc)
 
-# Final summary
-count=${#times[@]}
-echo ""
-echo "=== Final Benchmark Summary ==="
-echo "Total requests: $count"
-echo "Failed requests: $errors"
-echo "Total wall time: ${wall_time}s"
-echo "Total request time: ${total_time}s"
-echo "Average request time: ${avg_time}s"
-echo "Median request time: ${median}s"
-echo "95th percentile: ${p95}s"
-echo "Total response size: ${total_size} bytes"
-echo ""
+echo "Benchmark done"
 echo "Detailed report written to: $OUTPUT_CSV"
