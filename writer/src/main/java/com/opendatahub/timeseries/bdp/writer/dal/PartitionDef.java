@@ -57,6 +57,7 @@ public class PartitionDef {
 	public Integer period;
 	
 	
+	public PartitionDef(){}
 
 	public PartitionDef(Partition partition, String origin, String stationtype, DataType type, Integer period) {
 		this.partition = partition;
