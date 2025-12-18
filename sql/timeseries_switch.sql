@@ -108,5 +108,15 @@ vacuum full measurement;
 vacuum full measurementstring;
 vacuum full measurementjson;
 
+-- flag flyway migrations as applied
+INSERT INTO flyway_schema_history (installed_rank, "version", description, "type", script, checksum, installed_by, installed_on, execution_time, success)
+VALUES(5, '05', 'timeseries', 'SQL', 'V05__timeseries.sql', -718283751, 'clezag', now(), 0, true);
+
+INSERT INTO flyway_schema_history (installed_rank, "version", description, "type", script, checksum, installed_by, installed_on, execution_time, success)
+VALUES(6, '05.1', 'timeseries cleanup', 'SQL', 'V05.1__timeseries_cleanup.sql', 726016081, 'clezag', now(), 0, true);
+
+INSERT INTO intimev2.flyway_schema_history (installed_rank, "version", description, "type", script, checksum, installed_by, installed_on, execution_time, success)
+VALUES(7, '06', 'partitioning', 'SQL', 'V06__partitioning.sql', 1462489619, 'clezag', now(), 0, true);
+
 \echo 'JOB DONE'
 

@@ -57,12 +57,54 @@ CREATE TABLE intimev2.new_measurementstringhistory (
 -- fill timeseries table from both history and latest (unfortunately we have discrepancies)
 \echo 'start inserting timeseries'
 SELECT NOW();
+insert into timeseries (station_id, type_id, period, value_table) 
+select distinct station_id, type_id, period, 'measurementstring' from measurementstring ;
 
 insert into timeseries (station_id, type_id, period, value_table) 
 select distinct mh.station_id, mh.type_id, mh.period, 'measurementstring' 
 from measurementstringhistory mh
 left outer join timeseries ts on ts.station_id = mh.station_id and ts.type_id = mh.type_id  and ts."period" = mh."period" and ts.value_table = 'measurementstring'
 where ts.id is null;
+
+-- create trigger to duplicate row and insert new timeseries records
+	CREATE OR REPLACE FUNCTION intimev2.sync_measurementstringhistory()
+	RETURNS TRIGGER AS $$
+	DECLARE
+	    v_timeseries_id int4;
+	BEGIN
+	    -- Look up or insert timeseries record
+	    INSERT INTO intimev2.timeseries (station_id, type_id, period, value_table)
+	    VALUES (NEW.station_id, NEW.type_id, NEW.period, 'measurementstring')
+	    ON CONFLICT (station_id, type_id, period, value_table) 
+	    DO UPDATE SET station_id = EXCLUDED.station_id  -- dummy update to return id
+	    RETURNING id INTO v_timeseries_id;
+	    
+	    -- Insert into new table
+	    INSERT INTO intimev2.new_measurementstringhistory (
+	        created_on,
+	        timestamp,
+	        string_value,
+	        provenance_id,
+	        timeseries_id,
+	        partition_id
+	    ) VALUES (
+	        NEW.created_on,
+	        NEW.timestamp,
+	        NEW.string_value,
+	        NEW.provenance_id,
+	        v_timeseries_id,
+	        1  -- default partition_id
+	    );
+	    
+	    RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;
+
+	CREATE TRIGGER trg_sync_measurementstringhistory
+	    AFTER INSERT ON intimev2.measurementstringhistory
+	    FOR EACH ROW
+	    EXECUTE FUNCTION intimev2.sync_measurementstringhistory();
+	
 
 \echo 'start copying'
 SELECT NOW();
