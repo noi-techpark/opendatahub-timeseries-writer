@@ -1,3 +1,7 @@
+-- SPDX-FileCopyrightText: 2025 NOI Techpark <digital@noi.bz.it>
+--
+-- SPDX-License-Identifier: CC0-1.0
+
 -- set session parameters
 set search_path=intimev2,public;
 SET work_mem = '2GB';
