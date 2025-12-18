@@ -182,7 +182,8 @@ CREATE TABLE intimev2.new_measurementjsonhistory (
 	json_value jsonb NOT NULL,
 	provenance_id int8 NULL,
     timeseries_id int4 not null,
-    partition_id int2 not null default 1
+    partition_id int2 not null default 1,
+    json_value_md5 varchar(32) GENERATED ALWAYS AS (md5(json_value::text)) STORED NULL
 );
 
 -- fill timeseries table from both history and latest (unfortunately we have discrepancies)

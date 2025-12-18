@@ -122,7 +122,3 @@ grant select on measurementhistory to bdp_readonly;
 grant select on measurementstringhistory to bdp_readonly;
 grant select on measurementjsonhistory to bdp_readonly;
 
--- Mark flyway migrations as applied
-
-INSERT INTO intimev2.flyway_schema_history (installed_rank, "version", description, "type", script, checksum, installed_by, installed_on, execution_time, success)
-VALUES(7, '06', 'partitioning', 'SQL', 'V06__partitioning.sql', 1462489619, 'clezag', now(), 0, true);
