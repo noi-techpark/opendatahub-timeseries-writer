@@ -25,7 +25,6 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
@@ -37,6 +36,8 @@ import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Measurement;
 import com.opendatahub.timeseries.bdp.writer.dal.MeasurementAbstract;
+import com.opendatahub.timeseries.bdp.writer.dal.Partition;
+import com.opendatahub.timeseries.bdp.writer.dal.PartitionDef;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.writer.Application;
 
@@ -46,11 +47,11 @@ public class DataRetrievalITTest extends WriterSetupTest {
 
 	@Test
 	public void testStationFetch() {
-		Station station = Station.findStation(em, PREFIX + "non-existent-stationtype", PREFIX + "hey");
+		Station station = Station.findStation(em, "non-existent-stationtype", "hey");
 		assertNull(station);
-		List<Station> stationsWithOrigin = Station.findStations(em, PREFIX + "TrafficSensor", PREFIX + "FAMAS-traffic");
+		List<Station> stationsWithOrigin = Station.findStations(em, "TrafficSensor", "FAMAS-traffic");
 		assertNotNull(stationsWithOrigin);
-		List<Station> stations = Station.findStations(em, PREFIX + "TrafficSensor", null);
+		List<Station> stations = Station.findStations(em, "TrafficSensor", null);
 		assertNotNull(stations);
 	}
 
@@ -61,18 +62,18 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		Station station = Station.findStation(em, this.station.getStationtype(), this.station.getStationcode());
 		MeasurementAbstract latestEntry = new Measurement().findLatestEntry(em, station, type, period);
 		assertNotNull(latestEntry);
-		assertEquals(period, latestEntry.getPeriod());
+		assertEquals(period, latestEntry.getTimeseries().getPeriod());
 		assertTrue(this.station.getActive());
 		assertTrue(this.station.getAvailable());
 	}
 
 	@Test
 	public void testSyncStations() {
-		StationDto s = new StationDto(PREFIX + "WRITER", "Some name", null, null);
+		StationDto s = new StationDto("WRITER", "Some name", null, null);
 		List<StationDto> dtos = new ArrayList<StationDto>();
 		dtos.add(s);
 		ResponseEntity<Object> result = dataManager.syncStations(
-				PREFIX + "EnvironmentStation",
+				"EnvironmentStation",
 				dtos,
 				null,
 				"testProvenance",
@@ -84,7 +85,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 
 	@Test
 	public void testSyncDataTypes() {
-		DataTypeDto t = new DataTypeDto(PREFIX + "WRITER", null, null, null);
+		DataTypeDto t = new DataTypeDto("WRITER", null, null, null);
 		List<DataTypeDto> dtos = new ArrayList<DataTypeDto>();
 		dtos.add(t);
 		ResponseEntity<Object> result = dataManager.syncDataTypes(dtos, null);
@@ -120,9 +121,9 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	@Test
 	public void testDuplicateStations() {
 		List<StationDto> dtos = new ArrayList<StationDto>();
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 1", null, null));
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 1", null, null));
-		dtos.add(new StationDto(PREFIX + "WRITER", "Some name 2", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 1", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 1", null, null));
+		dtos.add(new StationDto("WRITER", "Some name 2", null, null));
 		ResponseEntity<Object> result = dataManager.syncStations(
 				STATION_TYPE,
 				dtos,
@@ -138,11 +139,11 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	public void testDuplicateMeasurements() {
 		List<RecordDtoImpl> values = new ArrayList<>();
 		values.add(new SimpleRecordDto(measurementOld.getTimestamp().getTime(), measurementOld.getValue(),
-				measurementOld.getPeriod()));
+				measurementOld.getTimeseries().getPeriod()));
 		values.add(new SimpleRecordDto(measurement.getTimestamp().getTime(), measurement.getValue(),
-				measurement.getPeriod()));
+				measurement.getTimeseries().getPeriod()));
 		values.add(new SimpleRecordDto(measurementOld.getTimestamp().getTime(), measurementOld.getValue(),
-				measurementOld.getPeriod()));
+				measurementOld.getTimeseries().getPeriod()));
 
 		// Number measurements newer as the latest entry
 		values.add(new SimpleRecordDto(measurement.getTimestamp().getTime() + 1000, 3.33, 1800));
@@ -165,7 +166,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 	
 	@Test
 	public void testPushRecords(){
-		DataType tCount = new DataType(PREFIX + "reccount", "", "Fake type", "test");
+		DataType tCount = new DataType("reccount", "", "Fake type", "test");
 		em.getTransaction().begin();
 		em.persist(tCount);
 		em.getTransaction().commit();
@@ -180,7 +181,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		var dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
 		
-		var qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		var qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		// all there
 		assertEquals(3L, qResult.intValue());
 		
@@ -190,7 +191,7 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		recs.add(new SimpleRecordDto(ts+3, 1.3, 600));
 		dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
-		qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		assertEquals(4L, qResult.intValue());
 
 		// Insert different periods, should ignore one record for each period because of timestamp
@@ -202,8 +203,34 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		recs.add(new SimpleRecordDto(ts, 1.3, 10));
 		dmResult = dataManager.pushRecords(STATION_TYPE, null, DataMapDto.build(provenance.getUuid(), station.getStationcode(), tCount.getCname(), recs));
 		assertEquals(HttpStatus.CREATED, dmResult.getStatusCode());
-		qResult = em.createQuery("select count(*) from MeasurementHistory where type.id = " + tCount.getId(), Long.class).getSingleResult();
+		qResult = em.createQuery("select count(*) from MeasurementHistory where timeseries.type.id = " + tCount.getId(), Long.class).getSingleResult();
 		assertEquals(7, qResult.intValue());
 	}
+	
+	@Test
+	public void testPartitionDef(){
+		em.getTransaction().begin();
+		em.persist(new PartitionDef(partition, "or1", null, null, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", null, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", type, null));
+		em.persist(new PartitionDef(partition, "or1", "s1", type, 100));
+		var part2 = new Partition("part2", "part2");
+		em.persist(new PartitionDef(part2, "or2", "s1", type, 100));
+		var part3 = new Partition("part3", "part3");
+		em.persist(new PartitionDef(part3, "or3", "s1", null, null));
+		em.persist(new PartitionDef(part3, "or3", null, type, null));
+		em.getTransaction().commit();
+		
+		System.out.println(" -------------- Dumping partition_def: ");
+		System.out.println(em.createQuery("select partitiondef from PartitionDef partitiondef").getResultList());
 
+		
+		// should not find, because or2 is only defined for specific period
+		assertNull(PartitionDef.findPartition(em, "or2", "s1", type, null));
+		// should find, because matches exactly
+		assertNotNull(PartitionDef.findPartition(em, "or2", "s1", type, 100));
+
+		assertNotNull(PartitionDef.findPartition(em, "or1","s1", type, 100));
+		assertNotNull(PartitionDef.findPartition(em, "or1","s1", type, null));
+	}
 }

@@ -22,10 +22,9 @@ import org.springframework.stereotype.Component;
 
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Event;
-import com.opendatahub.timeseries.bdp.writer.dal.MeasurementAbstract;
-import com.opendatahub.timeseries.bdp.writer.dal.MeasurementAbstractHistory;
 import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
+import com.opendatahub.timeseries.bdp.writer.dal.TimeSeries;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
@@ -69,7 +68,7 @@ public class DataManager {
 		LOG.debug("DataManager: pushRecords: {}, {}", stationType, responseLocation);
 		EntityManager entityManager = entityManagerFactory.createEntityManager();
 		try {
-			MeasurementAbstractHistory.pushRecords(entityManager, stationType, dataMap);
+			TimeSeries.pushRecords(entityManager, stationType, dataMap);
 		} catch (Exception e) {
 			throw JPAException.unnest(e);
 		} finally {
@@ -150,7 +149,7 @@ public class DataManager {
 		LOG.debug("DataManager: getDateOfLastRecord: {}, {}, {}, {}", stationType, stationCode, dataTypeName, period);
 		EntityManager entityManager = entityManagerFactory.createEntityManager();
 		try {
-			Date queryResult = MeasurementAbstract.getDateOfLastRecordSingleImpl(
+			Date queryResult = TimeSeries.getDateOfLastRecordSingleImpl(
 				entityManager,
 				stationType,
 				stationCode,

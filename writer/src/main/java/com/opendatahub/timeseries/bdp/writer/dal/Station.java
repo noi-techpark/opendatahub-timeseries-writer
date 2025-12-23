@@ -40,6 +40,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
@@ -59,7 +60,14 @@ import jakarta.persistence.UniqueConstraint;
  * @author Bertolla Patrick
  * @author Peter Moser
  */
-@Table(name = "station", uniqueConstraints = @UniqueConstraint(columnNames = { "stationcode", "stationtype" }))
+@Table(name = "station", 
+	uniqueConstraints = @UniqueConstraint(columnNames = { "stationcode", "stationtype" }),
+	indexes = {
+		@Index(columnList = "parent_id"),
+		@Index(columnList = "origin"),
+		@Index(columnList = "stationtype"),
+	}
+)
 @Entity
 public class Station {
 

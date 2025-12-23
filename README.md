@@ -245,6 +245,7 @@ validation only (for security reasons). Usually, we set the value
 This chapter describes the most important DAL entities:
 - `station`
 - `datatype`
+- `timeseries`
 - `record`
 - `edge`
 
@@ -275,10 +276,13 @@ and a unit. Description and metric of measurements can also be provided.
 >A `temperature` can have a unit `°C` and can be an `average` value of the last
 >300 seconds (called `period`).
 
+**TimeSeries**
+A `timeseries` represents the unique set of records, which all have the same `data-type`, `station` and `period`.
+
 **Record**
 
 A `record` represents a single measurement containing a `value`, a `timestamp` ,
-a `data-type`, a `station`, and a `provenance`. Provenance indicates which data
+a `timeseries`, and a `provenance`. Provenance indicates which data
 collector in which version collected the data. It is needed to implement
 traceability between collectors and inserted data, to identify data for
 cleansing or bug fixes.

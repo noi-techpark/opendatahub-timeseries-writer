@@ -1,5 +1,4 @@
 // Copyright © 2018 IDM Südtirol - Alto Adige (info@idm-suedtirol.com)
-
 // SPDX-License-Identifier: GPL-3.0-only
 
 package com.opendatahub.timeseries.bdp.tools;
@@ -15,9 +14,9 @@ import jakarta.persistence.Entity;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-import org.hibernate.tool.hbm2ddl.SchemaExport;
-import org.hibernate.tool.hbm2ddl.SchemaExport.Action;
 import org.hibernate.tool.schema.TargetType;
+import org.hibernate.tool.schema.spi.SchemaManagementToolCoordinator.ActionGrouping;
+import org.hibernate.tool.schema.Action;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.reflections.Reflections;
 
@@ -46,7 +45,7 @@ import org.reflections.Reflections;
 public class SchemaGenerator {
 
 	private static final String PGUSER_DEFAULT    = "postgres";
-	private static final String HIBERNATE_DIALECT = "org.hibernate.spatial.dialect.postgis.PostgisDialect";
+	private static final String HIBERNATE_DIALECT = "org.hibernate.dialect.PostgreSQLDialect";
 
 	public static void main(String[] args) {
 		Map<String, String> env = System.getenv();
@@ -104,8 +103,6 @@ public class SchemaGenerator {
 
 		/*
 		 * Build meta data sources for a hibernate registry defined by a PostgreSQL data source.
-		 * fails it succeeds in building a DDL SQL script.  The drawback hereby is, that it generates
-		 * a warning on stderr, which cannot be avoided with a try-catch...
 		 */
 		PGSimpleDataSource ds = new PGSimpleDataSource();
 		ds.setDatabaseName(env.get("ODH_SG_DBNAME"));
@@ -115,6 +112,8 @@ public class SchemaGenerator {
 				.applySetting("hibernate.connection.datasource", ds)
 				.applySetting("hibernate.dialect", HIBERNATE_DIALECT)
 				.applySetting("hibernate.implicit_naming_strategy", namingStrategy)
+				.applySetting("jakarta.persistence.schema-generation.scripts.action", "create")
+				.applySetting("jakarta.persistence.schema-generation.scripts.create-target", outputFile)
 				;
 
 		MetadataSources metaDataSources = new MetadataSources(registryBuilder.build());
@@ -130,17 +129,10 @@ public class SchemaGenerator {
 		Metadata metaData = metaDataSources.buildMetadata();
 
 		/*
-		 * Export the schema to "outputFile".  We write only create statements, since we must
-		 * not cleanup any prior databases.  What we want is to have a script that can populate
-		 * a new empty database.
+		 * Export the schema to "outputFile".
 		 */
 		System.out.println("Dumping schema...");
-		SchemaExport export = new SchemaExport();
-		export
-			.setDelimiter(";")
-			.setOutputFile(outputFile)
-			.setFormat(false)
-			.execute(EnumSet.of(TargetType.SCRIPT), Action.CREATE, metaData);
+		metaData.buildSessionFactory().close();
 		System.out.println("Done. Schema dumped to '" + outputFile + "':");
 	}
 }
