@@ -2,21 +2,18 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-- stop bluetooth elaboration
-- for every datatype:
-	- remove history primary key constraint/index to free up space
-	- create copy of history table with new structure (without indexes and foreign keys)
-	- create all timeseries from history and latest union
-	- create all timeseries from latest where not exist (avoid race)
-	- add trigger to history so that it inserts timeseries records where not exist, and duplicates to the copy table.
-	- insert all records from old history table into new (batched). use id < (min id on newtargettable)
-	- create new indexes
-	- pg_repack new table by timeseries_id index
-- stop bdp_core
-- alter latest tables
-- update latest tables, set timeseries_id
-- switcheroo the names 
-- start new bdp_core
-- switch to new ninja
-- drop old tables
+- scale up to m7i.4xlarge
+- increase storage size to +50% of occupied (to determine)
+- timeseries_prepare.sql
+- stop 
+	- bluetooth elaboration
+	- bdp-core
+	- ninja
+- timeseries_switch.sql
+- deploy new version and check 
+	- bdp-core
+	- ninja 
+	- bluetooth
+- partition.sql
+
 
