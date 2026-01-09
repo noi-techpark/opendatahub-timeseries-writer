@@ -9,8 +9,12 @@ import static net.logstash.logback.argument.StructuredArguments.v;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.geotools.api.geometry.MismatchedDimensionException;
 import org.geotools.api.referencing.FactoryException;
@@ -334,6 +338,24 @@ public class Station {
 				.setParameter("stationcode", stationCode)
 				.setParameter("stationtype", stationType)
 				.buildSingleResultOrNull(Station.class);
+	}
+	/**
+	 * @param em entity manager
+	 * @param stationType typology of a {@link Station}
+	 * @param stationCodes a set of identifiers of a {@link Station}
+	 *
+	 * @return get all stations of type matching the codes
+	 */
+	public static List<Station> findStationsByCodes(EntityManager em, String stationType, Set<String> stationCodes) {
+		if(stationCodes == null || stationCodes.isEmpty() || stationType == null || stationType.isEmpty())
+			return new ArrayList<>();
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT station FROM Station station",
+						"WHERE station.stationcode in(:ids) AND station.stationtype = :stationtype")
+				.setParameter("ids", new ArrayList<>(stationCodes))
+				.setParameter("stationtype", stationType)
+				.buildResultList(Station.class);
 	}
 
 	public static Station findStation(EntityManager em, String stationType, Integer stationCode) {

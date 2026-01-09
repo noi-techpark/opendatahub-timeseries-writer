@@ -4,11 +4,17 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import org.hibernate.Session;
 import org.hibernate.annotations.ColumnDefault;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -372,66 +378,74 @@ public class TimeSeries {
 
 			var skippedDataTypes = new HashSet<String>();
 			int skippedCount = 0;
+			
+			var stations = Station.findStationsByCodes(em, stationType, dataMap.getBranch().keySet())
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
+
+			var typeNames = dataMap.getBranch().values()
+				.stream()
+				.flatMap(s -> s.getBranch().keySet().stream())
+				.distinct()
+				.collect(Collectors.toSet());
+			
+			var types = DataType.findByCnames(em, typeNames)
+				.stream()
+				.collect(Collectors.toMap(DataType::getCname, Function.identity()));
+			
+			// TODO: find all possible (ignoring value table and period) timeseries + their latest record
+			// Add dirty flag to timeseries and only save those that have been touched (and new ones)
+			// series should save records to persist
+
+			List<Series> allSeries = new ArrayList<>();
+			
+			Session session = em.unwrap(Session.class);
+			em.getTransaction().begin();
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
-				Station station = Station.findStation(em, stationType, stationBranch.getKey());
+				Station station = stations.get((String)stationBranch.getKey());
 				if (station == null) {
 					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType,
 							stationBranch.getKey()));
 					continue;
 				}
 				for (var typeBranch : stationBranch.getValue().getBranch().entrySet()) {
-					try {
-						DataType type = DataType.findByCname(em, typeBranch.getKey());
-						if (type == null) {
-							log.warn(String.format("Type '%s' not found. Skipping...", typeBranch.getKey()));
-							continue;
+					DataType type = types.get(typeBranch.getKey());
+					if (type == null) {
+						log.warn(String.format("Type '%s' not found. Skipping...", typeBranch.getKey()));
+						continue;
+					}
+					var dataRecords = typeBranch.getValue().getData();
+					if (dataRecords.isEmpty()) {
+						log.warn("Empty data set. Skipping...");
+						continue;
+					}
+
+					// group records by datatype / period and sort by timestamp
+					// grouping to handle mixed value types (e.g. string/double) and periods within
+					// the same type
+					// timestamp sort to discard duplicate timestamps (because we compare against
+					// the running latest)
+					var simpleRecords = dataRecords.stream()
+							.map((r) -> new RecordBurrito((SimpleRecordDto) r))
+							.sorted(Comparator.comparing(RecordBurrito::getTable)
+									.thenComparing(RecordBurrito::getPeriod)
+									.thenComparing(RecordBurrito::getTimestamp))
+							.toList();
+
+					Series series = new Series(em, provenance, station, type, null, null);
+
+					for (RecordBurrito record : simpleRecords) {
+						if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
+							series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
+							allSeries.add(series);
 						}
-						var dataRecords = typeBranch.getValue().getData();
-						if (dataRecords.isEmpty()) {
-							log.warn("Empty data set. Skipping...");
-							continue;
-						}
 
-						// group records by datatype / period and sort by timestamp
-						// grouping to handle mixed value types (e.g. string/double) and periods within
-						// the same type
-						// timestamp sort to discard duplicate timestamps (because we compare against
-						// the running latest)
-						var simpleRecords = dataRecords.stream()
-								.map((r) -> new RecordBurrito((SimpleRecordDto) r))
-								.sorted(Comparator.comparing(RecordBurrito::getTable)
-										.thenComparing(RecordBurrito::getPeriod)
-										.thenComparing(RecordBurrito::getTimestamp))
-								.toList();
+						series.addHistory(record);
 
-						em.getTransaction().begin();
-
-						Series series = new Series(em, station, type, null, null);
-
-						for (RecordBurrito record : simpleRecords) {
-							if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
-								series.updateLatest(em, provenance);
-								series = new Series(em, station, type, record.getPeriod(), record.getTable());
-							}
-
-							series.addHistory(em, record, provenance);
-
-							if (series.skippedCount > 0) {
-								skippedDataTypes.add(type.getCname());
-								skippedCount += series.skippedCount;
-							}
-						}
-						series.updateLatest(em, provenance);
-
-						em.getTransaction().commit();
-					} catch (Exception ex) {
-						log.error(String.format("Exception '%s'... Skipping this measurement branch!", ex.getMessage()),
-								ex);
-						LOG.debug("Printing stack trace", ex);
-					} finally {
-						if (em.getTransaction().isActive()) {
-							em.getTransaction().rollback();
+						if (series.skippedCount > 0) {
+							skippedDataTypes.add(type.getCname());
+							skippedCount += series.skippedCount;
 						}
 					}
 				}
@@ -441,6 +455,38 @@ public class TimeSeries {
 				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]", skippedCount,
 						stationType, String.join(", ", skippedDataTypes)));
 			}
+			
+			// Performance optimizations to leverage hibernate batch operations
+			// For that we do all the inserts and updates grouped
+			
+			// Sort the timeseries per table, because hibernate only batches per table
+			allSeries = allSeries.stream().sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
+			
+			int flushCnt = 0;
+			// Do all the record inserts 
+			// this may also persist the timeseries record itself the first time it finds it
+			// If that turns out to be a problem, persist all the timeseries records first
+			for(Series s : allSeries){
+				flushCnt += s.persistHistory(em);
+				// Flush the Entity manager context every so often to avoid excessive memory use by persistence context
+				if (flushCnt > session.getJdbcBatchSize()) {
+					flushCnt = 0;
+					em.flush();
+					em.clear();
+				}
+			}
+			// Now to all the latest updates
+			for(Series s : allSeries){
+				flushCnt++;
+				s.updateLatest(em);
+				if (flushCnt > session.getJdbcBatchSize()) {
+					flushCnt = 0;
+					em.flush();
+					em.clear();
+				}
+			}
+
+			em.getTransaction().commit();
 		} catch (Exception e) {
 			throw JPAException.unnest(e);
 		} finally {
@@ -485,22 +531,28 @@ public class TimeSeries {
 		private long newestTime;
 		private RecordDtoImpl newest;
 		private TimeSeries timeseries;
+		private Provenance provenance;
+		
+		public String getTable(){
+			return timeseries.value_table.name();
+		}
 
 		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
 			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period
 					&& table == timeseries.getValueTable();
 		}
 
-		public Series(EntityManager em, Station station, DataType type, Integer period, ValueTable table) {
-			timeseries = TimeSeries.findTimeSeries(em, station, type, period, table);
-			latest = (timeseries != null) ? timeseries.findLatestEntry(em) : null;
-			newestTime = (latest != null) ? latest.getTimestamp().getTime() : 0;
+		public Series(Provenance provenance, MeasurementAbstract latest) {
+			this.provenance = provenance;
+			timeseries = latest.getTimeseries();
+			this.latest = latest;
 			newest = null;
+		}
 
-			if (timeseries == null) {
-				timeseries = new TimeSeries(station, type, period, table);
-				timeseries.setPartition(Partition.getDefault(em));
-			}
+		public Series(EntityManager em, Provenance provenance, Station station, DataType type, Integer period, ValueTable table) {
+			this.provenance = provenance;
+			timeseries = new TimeSeries(station, type, period, table);
+			timeseries.setPartition(Partition.getDefault(em));
 		}
 
 		private void updateNewest(RecordDtoImpl dto) {
@@ -509,15 +561,17 @@ public class TimeSeries {
 				newestTime = newest.getTimestamp();
 			}
 		}
+		
+		private List<MeasurementAbstractHistory> measures = new ArrayList<>();
 
-		public void addHistory(EntityManager em, SimpleRecordDto dto, Provenance provenance) throws Exception {
+		public void addHistory(SimpleRecordDto dto) throws Exception {
 			// In case of duplicates within a single push, which one is written and which
 			// one is discarded, is undefined (depends on the record sorting above)
 			if (newestTime < dto.getTimestamp()) {
 				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
 						new Date(dto.getTimestamp()));
 				rec.setProvenance(provenance);
-				em.persist(rec);
+				measures.add(rec);
 				updateNewest(dto);
 			} else {
 				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
@@ -526,8 +580,15 @@ public class TimeSeries {
 				skippedCount++;
 			}
 		}
+		
+		public int persistHistory(EntityManager em) {
+			for(MeasurementAbstractHistory m : measures) {
+				em.persist(m);
+			}
+			return measures.size();
+		}
 
-		public void updateLatest(EntityManager em, Provenance provenance) {
+		private void updateLatest(EntityManager em) {
 			if (newest != null) {
 				if (latest == null) {
 					var measurement = timeseries.newLatestRecord(newest.getValue(), new Date(newest.getTimestamp()));

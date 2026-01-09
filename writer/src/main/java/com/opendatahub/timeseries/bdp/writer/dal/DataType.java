@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -163,6 +164,18 @@ public class DataType {
 				.addSql("SELECT type FROM DataType type WHERE type.cname = :cname")
 				.setParameter("cname", dataType)
 				.buildSingleResultOrNull(DataType.class);
+	}
+	/**
+	 * @param em entity manager
+	 * @param dataTypes unique identifier for a data type
+	 * @return a data type entity from database
+	 */
+	public static List<DataType> findByCnames(EntityManager em, Set<String> dataTypes) {
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT type FROM DataType type WHERE type.cname in (:cnames)")
+				.setParameter("cnames", dataTypes)
+				.buildResultList(DataType.class);
 	}
 
 	/**
