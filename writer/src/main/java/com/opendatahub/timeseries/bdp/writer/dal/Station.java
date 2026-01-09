@@ -68,8 +68,8 @@ import jakarta.persistence.UniqueConstraint;
 	uniqueConstraints = @UniqueConstraint(columnNames = { "stationcode", "stationtype" }),
 	indexes = {
 		@Index(columnList = "parent_id"),
-		@Index(columnList = "origin"),
 		@Index(columnList = "stationtype"),
+		@Index(columnList = "meta_data_id"),
 	}
 )
 @Entity
@@ -128,26 +128,6 @@ public class Station {
 		setStationtype(stationType);
 		setStationcode(stationCode);
 		setName(stationName);
-	}
-
-	/**
-	 * Queries database on meta data of the specified station. Meta data consists of
-	 * defined fields like stationcode(uuid) and optional meta data which gets
-	 * versioned and only the newest one is used
-	 *
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param station
-	 *
-	 * @return detail information/meta data of the specified station(s)
-	 */
-	public static List<StationDto> findStationsDetails(EntityManager em, String stationType, Station station){
-		List<Station> resultList = new ArrayList<>();
-		if (station == null)
-			resultList = Station.findStations(em, stationType, true);
-		else
-			resultList.add(station);
-		return convertToDto(resultList);
 	}
 
 	/**
@@ -274,44 +254,6 @@ public class Station {
 	}
 
 	/**
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param isActive
-	 *
-	 * @return list of unique string identifier for each active station of a specific station type
-	 */
-	public static List<String> findStationCodes(EntityManager em, String stationType, boolean isActive) {
-		return em.createQuery("select station.stationcode from Station station where station.active = :active and station.stationtype = :stationtype", String.class)
-				 .setParameter("active", isActive)
-				 .setParameter("stationtype", stationType)
-				 .getResultList();
-	}
-
-
-	/**
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param isActive    activity state provided by the data collector
-	 *
-	 * @return			  a list of station entities filtered by their activity state and station typology
-	 */
-	public static List<Station> findStations(EntityManager em, String stationType, boolean isActive) {
-		return em.createQuery("select station from Station station where station.active = :active and station.stationtype = :stationtype", Station.class)
-				 .setParameter("active", isActive)
-				 .setParameter("stationtype", stationType)
-				 .getResultList();
-	}
-	/**
-	 * @param em entity manager
-	 *
-	 * @return unfiltered station entities
-	 */
-	public static List<Station> findStations(EntityManager em){
-		return em.createQuery("select station from Station station", Station.class)
-				 .getResultList();
-	}
-
-	/**
 	 * @param em entity manager
 	 *
 	 * @return unique string identifiers for each existing station type
@@ -358,39 +300,10 @@ public class Station {
 				.buildResultList(Station.class);
 	}
 
-	public static Station findStation(EntityManager em, String stationType, Integer stationCode) {
-		return findStation(em, stationType, (Object) stationCode);
-	}
-
 	public static Station findStation(EntityManager em, String stationType, String stationCode) {
 		if(stationCode.isEmpty())
 			return null;
 		return findStation(em, stationType, (Object) stationCode);
-	}
-
-	protected static List<String[]> getDataTypesFromQuery(List<Object[]> resultList){
-		List<String[]> stringlist = new ArrayList<>();
-		for(Object[] objects : resultList){
-			String[] stringarray= new String[objects.length];
-			for (int i = 0; i< objects.length;i++){
-				String value = String.valueOf(objects[i]);
-				stringarray[i]= "null".equals(value) ? "" : value;
-			}
-			stringlist.add(stringarray);
-		}
-		return stringlist;
-	}
-
-	protected static List<CoordinateDto> parseCoordinate(Coordinate[] coordinates) {
-		List<CoordinateDto> dtos = new ArrayList<>();
-		for (Coordinate coordinate: coordinates){
-			dtos.add(parseCoordinate(coordinate));
-		}
-		return dtos;
-	}
-
-	protected static CoordinateDto parseCoordinate(Coordinate coordinate) {
-		return new CoordinateDto(coordinate.x,coordinate.y);
 	}
 
 	/**
