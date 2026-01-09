@@ -69,6 +69,7 @@ public class Partition {
 
 	public static synchronized Partition getDefault(EntityManager em) {
 		Partition partition = em.find(Partition.class, 1L);
+		em.createQuery("select partition from Partition partition where name = 'default'");
 		if (partition == null) {
 			partition = new Partition("default", "Default Partition");
 			em.persist(partition);

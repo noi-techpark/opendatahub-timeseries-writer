@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.geotools.api.geometry.MismatchedDimensionException;
 import org.geotools.api.referencing.FactoryException;
@@ -27,11 +30,11 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.CoordinateDto;
-import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -64,8 +67,8 @@ import jakarta.persistence.UniqueConstraint;
 	uniqueConstraints = @UniqueConstraint(columnNames = { "stationcode", "stationtype" }),
 	indexes = {
 		@Index(columnList = "parent_id"),
-		@Index(columnList = "origin"),
 		@Index(columnList = "stationtype"),
+		@Index(columnList = "meta_data_id"),
 	}
 )
 @Entity
@@ -106,7 +109,7 @@ public class Station {
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "station", fetch = FetchType.LAZY)
 	private Collection<MetaData> metaDataHistory;
 
-	@OneToOne
+	@OneToOne(fetch = FetchType.LAZY)
 	private MetaData metaData;
 
 	public Station() {
@@ -127,26 +130,6 @@ public class Station {
 	}
 
 	/**
-	 * Queries database on meta data of the specified station. Meta data consists of
-	 * defined fields like stationcode(uuid) and optional meta data which gets
-	 * versioned and only the newest one is used
-	 *
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param station
-	 *
-	 * @return detail information/meta data of the specified station(s)
-	 */
-	public static List<StationDto> findStationsDetails(EntityManager em, String stationType, Station station){
-		List<Station> resultList = new ArrayList<>();
-		if (station == null)
-			resultList = Station.findStations(em, stationType, true);
-		else
-			resultList.add(station);
-		return convertToDto(resultList);
-	}
-
-	/**
 	 * Takes informations from database fields and all meta data information from JSON field and
 	 * converts it to a serializable objects
 	 *
@@ -162,7 +145,6 @@ public class Station {
 		}
 		return stationList;
 	}
-
 
 	private static StationDto convertToDto(Station s) {
 		Double x = null;
@@ -270,44 +252,6 @@ public class Station {
 	}
 
 	/**
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param isActive
-	 *
-	 * @return list of unique string identifier for each active station of a specific station type
-	 */
-	public static List<String> findStationCodes(EntityManager em, String stationType, boolean isActive) {
-		return em.createQuery("select station.stationcode from Station station where station.active = :active and station.stationtype = :stationtype", String.class)
-				 .setParameter("active", isActive)
-				 .setParameter("stationtype", stationType)
-				 .getResultList();
-	}
-
-
-	/**
-	 * @param em          entity manager
-	 * @param stationType typology of a {@link Station}
-	 * @param isActive    activity state provided by the data collector
-	 *
-	 * @return			  a list of station entities filtered by their activity state and station typology
-	 */
-	public static List<Station> findStations(EntityManager em, String stationType, boolean isActive) {
-		return em.createQuery("select station from Station station where station.active = :active and station.stationtype = :stationtype", Station.class)
-				 .setParameter("active", isActive)
-				 .setParameter("stationtype", stationType)
-				 .getResultList();
-	}
-	/**
-	 * @param em entity manager
-	 *
-	 * @return unfiltered station entities
-	 */
-	public static List<Station> findStations(EntityManager em){
-		return em.createQuery("select station from Station station", Station.class)
-				 .getResultList();
-	}
-
-	/**
 	 * @param em entity manager
 	 *
 	 * @return unique string identifiers for each existing station type
@@ -335,40 +279,45 @@ public class Station {
 				.setParameter("stationtype", stationType)
 				.buildSingleResultOrNull(Station.class);
 	}
-
-	public static Station findStation(EntityManager em, String stationType, Integer stationCode) {
-		return findStation(em, stationType, (Object) stationCode);
+	/**
+	 * @param em entity manager
+	 * @param stationType typology of a {@link Station}
+	 * @param stationCodes a set of identifiers of a {@link Station}
+	 *
+	 * @return get all stations of type matching the codes
+	 */
+	public static List<Station> findStationsByCodes(EntityManager em, String stationType, Set<String> stationCodes) {
+		if(stationCodes == null || stationCodes.isEmpty() || stationType == null || stationType.isEmpty())
+			return new ArrayList<>();
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT station FROM Station station",
+						"WHERE station.stationcode in(:ids) AND station.stationtype = :stationtype")
+				.setParameter("ids", new ArrayList<>(stationCodes))
+				.setParameter("stationtype", stationType)
+				.buildResultList(Station.class);
+	}
+	/**
+	 * @param em entity manager
+	 * @param stationCodes a set of identifiers of a {@link Station}
+	 *
+	 * @return get all stations of type matching the codes
+	 */
+	public static List<Station> findStationsByCodesOnly(EntityManager em, Set<String> stationCodes) {
+		if(stationCodes == null || stationCodes.isEmpty())
+			return new ArrayList<>();
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT station FROM Station station",
+						"WHERE station.stationcode in(:ids)")
+				.setParameter("ids", new ArrayList<>(stationCodes))
+				.buildResultList(Station.class);
 	}
 
 	public static Station findStation(EntityManager em, String stationType, String stationCode) {
 		if(stationCode.isEmpty())
 			return null;
 		return findStation(em, stationType, (Object) stationCode);
-	}
-
-	protected static List<String[]> getDataTypesFromQuery(List<Object[]> resultList){
-		List<String[]> stringlist = new ArrayList<>();
-		for(Object[] objects : resultList){
-			String[] stringarray= new String[objects.length];
-			for (int i = 0; i< objects.length;i++){
-				String value = String.valueOf(objects[i]);
-				stringarray[i]= "null".equals(value) ? "" : value;
-			}
-			stringlist.add(stringarray);
-		}
-		return stringlist;
-	}
-
-	protected static List<CoordinateDto> parseCoordinate(Coordinate[] coordinates) {
-		List<CoordinateDto> dtos = new ArrayList<>();
-		for (Coordinate coordinate: coordinates){
-			dtos.add(parseCoordinate(coordinate));
-		}
-		return dtos;
-	}
-
-	protected static CoordinateDto parseCoordinate(Coordinate coordinate) {
-		return new CoordinateDto(coordinate.x,coordinate.y);
 	}
 
 	/**
@@ -394,6 +343,12 @@ public class Station {
 		List<String> stationCodes = new ArrayList<>();
 		em.getTransaction().begin();
 		try {
+			var allStations = findStationsByCodes(em, stationType, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
+			var parents = findStationsByCodesOnly(em, data.stream().map(StationDto::getParentStation).collect(Collectors.toSet()))
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
 			for (StationDto dto : data) {
 				if (dto.getStationType() == null) {
 					dto.setStationType(stationType);
@@ -407,7 +362,7 @@ public class Station {
 								dto.getId(),
 								v("StationDto", dto));
 					} else {
-						sync(em, dto);
+						sync(em, allStations, parents, dto);
 						stationCodes.add(dto.getId());
 					}
 				} else {
@@ -420,6 +375,7 @@ public class Station {
 			}
 			em.getTransaction().commit();
 		} catch (Exception e) {
+			LOG.error("Station sync failed", e);
 			throw JPAException.unnest(e);
 		} finally {
 			if (em.getTransaction().isActive()) {
@@ -449,8 +405,8 @@ public class Station {
 	 *
 	 * @throws JPAException is thrown if geographical transformation from one projection to another fails
 	 */
-	private static void sync(EntityManager em, StationDto dto) {
-		Station existingStation = Station.findStation(em, dto.getStationType(), dto.getId());
+	private static void sync(EntityManager em, Map<String, Station> stations,Map<String, Station> parents, StationDto dto) throws Exception{
+		Station existingStation = stations.get(dto.getId());
 		if (existingStation == null) {
 			existingStation = new Station();
 			existingStation.setStationcode(dto.getId());
@@ -479,9 +435,12 @@ public class Station {
 		}
 		existingStation.setOrigin(dto.getOrigin());
 		if (dto.getParentStation() != null) {
-			Station parent = Station.findStationByIdentifier(em, dto.getParentStation());
-			if (parent != null)
+			Station parent = parents.get(dto.getParentStation());
+			if (parent != null) {
 				existingStation.setParent(parent);
+			} else {
+				throw new Exception("Could not find parent station " + dto.getParentStation());
+			}
 		}
 		
 		/* We do not need to check for NULL, nor empty strings, because the writer will take care of that */

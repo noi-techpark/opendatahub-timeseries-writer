@@ -4,15 +4,26 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.Session;
+import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
@@ -27,8 +38,6 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -54,13 +63,12 @@ public class TimeSeries {
 	@Id
 	@GeneratedValue(generator = "timeseries_gen", strategy = GenerationType.SEQUENCE)
 	@SequenceGenerator(name = "timeseries_gen", sequenceName = "timeseries_seq", allocationSize = 1)
-	@ColumnDefault(value = "nextval('timeseries_seq')")
 	protected Long id;
 
-	@ManyToOne(cascade = CascadeType.ALL, optional = false)
+	@ManyToOne(optional = false)
 	private Station station;
 
-	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	@ManyToOne(optional = false)
 	private DataType type;
 
 	@Column(nullable = false)
@@ -70,18 +78,23 @@ public class TimeSeries {
 	@Convert(converter = ValueTableConverter.class)
 	private ValueTable value_table;
 
+	@ManyToOne(cascade = CascadeType.ALL, optional = false)
+	private Partition partition;
+
 	public static enum ValueTable {
-		NUMBER("measurement", Measurement.class, MeasurementHistory.class),
-		STRING("measurementstring", MeasurementString.class, MeasurementStringHistory.class),
-		JSON("measurementjson", MeasurementJSON.class, MeasurementJSONHistory.class);
+		NUMBER("measurement", "double_value", Measurement.class, MeasurementHistory.class),
+		STRING("measurementstring", "string_value", MeasurementString.class, MeasurementStringHistory.class),
+		JSON("measurementjson", "json_value", MeasurementJSON.class, MeasurementJSONHistory.class);
 
 		public final String table;
+		public final String column;
 		public final Class<? extends MeasurementAbstract> latestClass;
 		public final Class<? extends MeasurementAbstractHistory> historyClass;
 
-		ValueTable(String table, Class<? extends MeasurementAbstract> latestClass,
+		ValueTable(String table, String column, Class<? extends MeasurementAbstract> latestClass,
 				Class<? extends MeasurementAbstractHistory> historyClass) {
 			this.table = table;
+			this.column = column;
 			this.latestClass = latestClass;
 			this.historyClass = historyClass;
 		}
@@ -108,9 +121,6 @@ public class TimeSeries {
 			return ValueTable.getByTable(dbData);
 		}
 	}
-
-	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
-	private Partition partition;
 
 	public TimeSeries() {
 	}
@@ -338,7 +348,7 @@ public class TimeSeries {
 			return table;
 		}
 	}
-
+	
 	/**
 	 * <p>
 	 * persists all measurement data send to the writer from data collectors to the
@@ -370,68 +380,105 @@ public class TimeSeries {
 			}
 			log.setProvenance(provenance);
 
+			LOG.debug("Loading stations");
+			// Preload all the stations, types, latest etc. so we don't have to query for every record
+			var stations = Station.findStationsByCodes(em, stationType, dataMap.getBranch().keySet())
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
+
+			var typeNames = dataMap.getBranch().values()
+				.stream()
+				.flatMap(s -> s.getBranch().keySet().stream())
+				.distinct()
+				.collect(Collectors.toSet());
+			
+			LOG.debug("Loading types");
+			var types = DataType.findByCnames(em, typeNames)
+				.stream()
+				.collect(Collectors.toMap(DataType::getCname, Function.identity()));
+			
+			LOG.debug("Loading latest");
+			// tree stationcode/type.cname/period/table
+			var measurements = MeasurementAbstract.findLatest(em, stations.values(), types.values())
+				.stream()
+				.collect(Collectors.groupingBy(
+					l -> l.getTimeseries().station.stationcode,
+					Collectors.groupingBy(
+						l -> l.getTimeseries().getType().getCname(),
+						Collectors.groupingBy(
+							l -> l.getTimeseries().getPeriod(),
+							Collectors.toMap(
+								l -> l.getTimeseries().getValueTable(),
+								Function.identity()
+							)
+						)
+					)
+				));
+
 			var skippedDataTypes = new HashSet<String>();
 			int skippedCount = 0;
+			List<Series> allSeries = new ArrayList<>();
+			
+			LOG.debug("Loaded all stations, types, latest. Now walking tree");
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
-				Station station = Station.findStation(em, stationType, stationBranch.getKey());
+				Station station = stations.get((String)stationBranch.getKey());
 				if (station == null) {
 					log.warn(String.format("Station '%s/%s' not found. Skipping...", stationType,
 							stationBranch.getKey()));
 					continue;
 				}
 				for (var typeBranch : stationBranch.getValue().getBranch().entrySet()) {
-					try {
-						DataType type = DataType.findByCname(em, typeBranch.getKey());
-						if (type == null) {
-							log.warn(String.format("Type '%s' not found. Skipping...", typeBranch.getKey()));
-							continue;
-						}
-						var dataRecords = typeBranch.getValue().getData();
-						if (dataRecords.isEmpty()) {
-							log.warn("Empty data set. Skipping...");
-							continue;
-						}
+					DataType type = types.get(typeBranch.getKey());
+					if (type == null) {
+						log.warn(String.format("Type '%s' not found. Skipping...", typeBranch.getKey()));
+						continue;
+					}
+					var dataRecords = typeBranch.getValue().getData();
+					if (dataRecords.isEmpty()) {
+						log.warn("Empty data set. Skipping...");
+						continue;
+					}
 
-						// group records by datatype / period and sort by timestamp
-						// grouping to handle mixed value types (e.g. string/double) and periods within
-						// the same type
-						// timestamp sort to discard duplicate timestamps (because we compare against
-						// the running latest)
-						var simpleRecords = dataRecords.stream()
-								.map((r) -> new RecordBurrito((SimpleRecordDto) r))
-								.sorted(Comparator.comparing(RecordBurrito::getTable)
-										.thenComparing(RecordBurrito::getPeriod)
-										.thenComparing(RecordBurrito::getTimestamp))
-								.toList();
+					// group records by datatype / period and sort by timestamp
+					// grouping to handle mixed value types (e.g. string/double) and periods within
+					// the same type
+					// timestamp sort to discard duplicate timestamps (because we compare against
+					// the running latest)
+					var simpleRecords = dataRecords.stream()
+							.map((r) -> new RecordBurrito((SimpleRecordDto) r))
+							.sorted(Comparator.comparing(RecordBurrito::getTable)
+									.thenComparing(RecordBurrito::getPeriod)
+									.thenComparing(RecordBurrito::getTimestamp))
+							.toList();
 
-						em.getTransaction().begin();
+					Series series = new Series(em, provenance, station, type, null, null);
 
-						Series series = new Series(em, station, type, null, null);
-
-						for (RecordBurrito record : simpleRecords) {
-							if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
-								series.updateLatest(em, provenance);
-								series = new Series(em, station, type, record.getPeriod(), record.getTable());
+					for (RecordBurrito record : simpleRecords) {
+						// Since we've sorted before looping, if a record doesn't fit the current timeseries, we move on to the next one
+						if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
+							// check if latest record (and timeseries) exists, or we create a new one
+							MeasurementAbstract latest = Optional.ofNullable(measurements)
+									.map(m -> m.get(station.stationcode))
+									.map(m -> m.get(type.getCname()))
+									.map(m -> m.get(record.getPeriod()))
+									.map(m -> m.get(record.getTable()))
+									.orElse(null);
+							if (latest != null) {
+								series = new Series(provenance, latest);
+							} else {
+								series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
 							}
-
-							series.addHistory(em, record, provenance);
-
-							if (series.skippedCount > 0) {
-								skippedDataTypes.add(type.getCname());
-								skippedCount += series.skippedCount;
+							if (record.getTable() != null) {
+								allSeries.add(series);
 							}
 						}
-						series.updateLatest(em, provenance);
 
-						em.getTransaction().commit();
-					} catch (Exception ex) {
-						log.error(String.format("Exception '%s'... Skipping this measurement branch!", ex.getMessage()),
-								ex);
-						LOG.debug("Printing stack trace", ex);
-					} finally {
-						if (em.getTransaction().isActive()) {
-							em.getTransaction().rollback();
+						series.addHistory(record);
+
+						if (series.skippedCount > 0) {
+							skippedDataTypes.add(type.getCname());
+							skippedCount += series.skippedCount;
 						}
 					}
 				}
@@ -441,6 +488,35 @@ public class TimeSeries {
 				log.warn(String.format("Skipped %d records due to timestamp for type: [%s, (%s)]", skippedCount,
 						stationType, String.join(", ", skippedDataTypes)));
 			}
+			
+			// Performance optimizations to leverage hibernate batch operations
+			// For that we do all the inserts and updates grouped
+			
+			// Sort the timeseries per table, because hibernate only batches per table
+			allSeries = allSeries.stream()
+				.filter(s -> !s.getMeasures().isEmpty())
+				.sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
+			
+			LOG.debug("Starting insert");
+
+			em.getTransaction().begin();
+
+			allSeries.stream()
+				.map(s -> s.timeseries)
+				.filter(t -> t.id == null)
+				.forEach(t -> em.persist(t));
+			
+			allSeries.stream()
+				.flatMap(s -> s.measures.stream())
+				.forEach(m -> em.persist(m));
+			
+			LOG.debug("updating latest");
+			for (Series s : allSeries) {
+				s.updateLatest(em);
+			}
+			LOG.debug("committing");
+
+			em.getTransaction().commit();
 		} catch (Exception e) {
 			throw JPAException.unnest(e);
 		} finally {
@@ -485,22 +561,31 @@ public class TimeSeries {
 		private long newestTime;
 		private RecordDtoImpl newest;
 		private TimeSeries timeseries;
-
-		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
-			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period
-					&& table == timeseries.getValueTable();
+		private Provenance provenance;
+		
+		public String getTable(){
+			return timeseries.value_table.name();
 		}
 
-		public Series(EntityManager em, Station station, DataType type, Integer period, ValueTable table) {
-			timeseries = TimeSeries.findTimeSeries(em, station, type, period, table);
-			latest = (timeseries != null) ? timeseries.findLatestEntry(em) : null;
-			newestTime = (latest != null) ? latest.getTimestamp().getTime() : 0;
-			newest = null;
+		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
+			return station.getId().equals(timeseries.station.getId()) 
+				&& type.getId().equals(timeseries.getType().getId()) 
+				&& period.equals(timeseries.period)
+				&& table.equals(timeseries.getValueTable());
+		}
 
-			if (timeseries == null) {
-				timeseries = new TimeSeries(station, type, period, table);
-				timeseries.setPartition(Partition.getDefault(em));
-			}
+		public Series(Provenance provenance, MeasurementAbstract latest) {
+			this.provenance = provenance;
+			timeseries = latest.getTimeseries();
+			this.latest = latest;
+			newestTime = latest.getTimestamp().getTime();
+			newest = null;
+		}
+
+		public Series(EntityManager em, Provenance provenance, Station station, DataType type, Integer period, ValueTable table) {
+			this.provenance = provenance;
+			timeseries = new TimeSeries(station, type, period, table);
+			timeseries.setPartition(Partition.getDefault(em));
 		}
 
 		private void updateNewest(RecordDtoImpl dto) {
@@ -509,25 +594,36 @@ public class TimeSeries {
 				newestTime = newest.getTimestamp();
 			}
 		}
+		
+		private List<MeasurementAbstractHistory> measures = new ArrayList<>();
 
-		public void addHistory(EntityManager em, SimpleRecordDto dto, Provenance provenance) throws Exception {
+		public void addHistory(SimpleRecordDto dto) throws Exception {
 			// In case of duplicates within a single push, which one is written and which
 			// one is discarded, is undefined (depends on the record sorting above)
-			if (newestTime < dto.getTimestamp()) {
-				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
-						new Date(dto.getTimestamp()));
-				rec.setProvenance(provenance);
-				em.persist(rec);
-				updateNewest(dto);
-			} else {
+			if (newestTime >= dto.getTimestamp()) {
 				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
 						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
 						timeseries.period, dto.getTimestamp()));
 				skippedCount++;
+			} else if (timeseries.getValueTable() == null) {
+				LOG.debug(String.format("Skipping record due to unknown value type: [%s, %s, %s, %d, %d, %s]",
+						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
+						timeseries.period, dto.getTimestamp(), dto.getValue()));
+				skippedCount++;
+			} else {
+				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
+						new Date(dto.getTimestamp()));
+				rec.setProvenance(provenance);
+				measures.add(rec);
+				updateNewest(dto);
 			}
 		}
+		
+		public List<MeasurementAbstractHistory> getMeasures(){
+			return measures;
+		}
 
-		public void updateLatest(EntityManager em, Provenance provenance) {
+		private void updateLatest(EntityManager em) {
 			if (newest != null) {
 				if (latest == null) {
 					var measurement = timeseries.newLatestRecord(newest.getValue(), new Date(newest.getTimestamp()));

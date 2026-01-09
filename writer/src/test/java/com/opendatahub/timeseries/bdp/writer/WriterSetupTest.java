@@ -84,7 +84,7 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> postgres.getJdbcUrl() + "?currentSchema=intimev2,public");
+        registry.add("spring.datasource.url", () -> postgres.getJdbcUrl() + "?currentSchema=intimev2");
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
     }
