@@ -8,6 +8,8 @@ package com.opendatahub.timeseries.bdp.writer.writer;
 import java.util.Map;
 
 import org.hibernate.PropertyValueException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -20,6 +22,7 @@ import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
 import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.opendatahub.timeseries.bdp.dto.dto.ExceptionDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
+import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +36,7 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 @ControllerAdvice
 public class ExceptionControllerAdvice extends ResponseEntityExceptionHandler {
+	private static final Logger LOG = LoggerFactory.getLogger(ExceptionControllerAdvice.class);
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<Object> handleAll(HttpServletRequest request, Exception ex) {
@@ -93,6 +97,7 @@ public class ExceptionControllerAdvice extends ResponseEntityExceptionHandler {
 			request.setAttribute("exception_dto", exceptionDto);
 			request.setAttribute("exception", ex);
 		}
+		LOG.error("API returned error due to exception", ex);
 		return ResponseEntity.status(httpStatus).body(exceptionDto);
 	}
 }

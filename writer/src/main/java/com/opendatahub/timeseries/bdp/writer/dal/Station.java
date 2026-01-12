@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import org.geotools.api.geometry.MismatchedDimensionException;
@@ -34,7 +35,6 @@ import org.slf4j.LoggerFactory;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.CoordinateDto;
 import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -299,6 +299,22 @@ public class Station {
 				.setParameter("stationtype", stationType)
 				.buildResultList(Station.class);
 	}
+	/**
+	 * @param em entity manager
+	 * @param stationCodes a set of identifiers of a {@link Station}
+	 *
+	 * @return get all stations of type matching the codes
+	 */
+	public static List<Station> findStationsByCodesOnly(EntityManager em, Set<String> stationCodes) {
+		if(stationCodes == null || stationCodes.isEmpty())
+			return new ArrayList<>();
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT station FROM Station station",
+						"WHERE station.stationcode in(:ids)")
+				.setParameter("ids", new ArrayList<>(stationCodes))
+				.buildResultList(Station.class);
+	}
 
 	public static Station findStation(EntityManager em, String stationType, String stationCode) {
 		if(stationCode.isEmpty())
@@ -329,6 +345,12 @@ public class Station {
 		List<String> stationCodes = new ArrayList<>();
 		em.getTransaction().begin();
 		try {
+			var allStations = findStationsByCodes(em, stationType, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
+			var parents = findStationsByCodesOnly(em, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
+				.stream()
+				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
 			for (StationDto dto : data) {
 				if (dto.getStationType() == null) {
 					dto.setStationType(stationType);
@@ -342,7 +364,7 @@ public class Station {
 								dto.getId(),
 								v("StationDto", dto));
 					} else {
-						sync(em, dto);
+						sync(em, allStations, parents, dto);
 						stationCodes.add(dto.getId());
 					}
 				} else {
@@ -355,6 +377,7 @@ public class Station {
 			}
 			em.getTransaction().commit();
 		} catch (Exception e) {
+			LOG.error("Station sync failed", e);
 			throw JPAException.unnest(e);
 		} finally {
 			if (em.getTransaction().isActive()) {
@@ -384,8 +407,8 @@ public class Station {
 	 *
 	 * @throws JPAException is thrown if geographical transformation from one projection to another fails
 	 */
-	private static void sync(EntityManager em, StationDto dto) {
-		Station existingStation = Station.findStation(em, dto.getStationType(), dto.getId());
+	private static void sync(EntityManager em, Map<String, Station> stations,Map<String, Station> parents, StationDto dto) {
+		Station existingStation = stations.get(dto.getId());
 		if (existingStation == null) {
 			existingStation = new Station();
 			existingStation.setStationcode(dto.getId());
@@ -414,7 +437,7 @@ public class Station {
 		}
 		existingStation.setOrigin(dto.getOrigin());
 		if (dto.getParentStation() != null) {
-			Station parent = Station.findStationByIdentifier(em, dto.getParentStation());
+			Station parent = parents.get(dto.getParentStation());
 			if (parent != null)
 				existingStation.setParent(parent);
 		}

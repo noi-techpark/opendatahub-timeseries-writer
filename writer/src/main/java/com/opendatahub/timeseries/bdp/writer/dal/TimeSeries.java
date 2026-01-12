@@ -10,12 +10,14 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.hibernate.Session;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +35,6 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -63,10 +63,10 @@ public class TimeSeries {
 	@ColumnDefault(value = "nextval('timeseries_seq')")
 	protected Long id;
 
-	@ManyToOne(cascade = CascadeType.ALL, optional = false)
+	@ManyToOne(optional = false)
 	private Station station;
 
-	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	@ManyToOne(optional = false)
 	private DataType type;
 
 	@Column(nullable = false)
@@ -115,7 +115,7 @@ public class TimeSeries {
 		}
 	}
 
-	@ManyToOne(cascade = CascadeType.PERSIST, optional = false)
+	@ManyToOne(cascade = CascadeType.ALL, optional = false)
 	private Partition partition;
 
 	public TimeSeries() {
@@ -344,7 +344,7 @@ public class TimeSeries {
 			return table;
 		}
 	}
-
+	
 	/**
 	 * <p>
 	 * persists all measurement data send to the writer from data collectors to the
@@ -393,13 +393,24 @@ public class TimeSeries {
 				.stream()
 				.collect(Collectors.toMap(DataType::getCname, Function.identity()));
 			
-			// TODO: find all possible (ignoring value table and period) timeseries + their latest record
-			// Add dirty flag to timeseries and only save those that have been touched (and new ones)
-			// series should save records to persist
+			var measurements = MeasurementAbstract.findLatest(em, stations.values(), types.values())
+				.stream()
+				.collect(Collectors.groupingBy(
+					l -> l.getTimeseries().station.stationcode,
+					Collectors.groupingBy(
+						l -> l.getTimeseries().getType().getCname(),
+						Collectors.groupingBy(
+							l -> l.getTimeseries().getPeriod(),
+							Collectors.toMap(
+								l -> l.getTimeseries().getValueTable(),
+								Function.identity()
+							)
+						)
+					)
+				));
 
 			List<Series> allSeries = new ArrayList<>();
 			
-			Session session = em.unwrap(Session.class);
 			em.getTransaction().begin();
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
@@ -436,9 +447,24 @@ public class TimeSeries {
 					Series series = new Series(em, provenance, station, type, null, null);
 
 					for (RecordBurrito record : simpleRecords) {
+						// Since we've sorted before looping, if a record doesn't fit the current timeseries, we move on to the next one
 						if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
-							series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
-							allSeries.add(series);
+							// check if latest record (and timeseries) exists, or we create a new one
+							MeasurementAbstract latest = Optional.ofNullable(measurements)
+								.map(m -> m.get(station.stationcode))
+								.map(m -> m.get(type.getCname()))
+								.map(m -> m.get(record.getPeriod()))
+								.map(m -> m.get(record.getTable()))
+								.orElse(null);
+							if (latest != null) {
+								series = new Series(provenance, latest);
+							} else {
+								series = new Series(em, provenance, station, type, record.getPeriod(),
+										record.getTable());
+								if (record.getTable() != null) {
+									allSeries.add(series);
+								}
+							}
 						}
 
 						series.addHistory(record);
@@ -462,6 +488,13 @@ public class TimeSeries {
 			// Sort the timeseries per table, because hibernate only batches per table
 			allSeries = allSeries.stream().sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
 			
+			// Determine the hibernate batch size to better batch bulk operations
+			SessionFactoryImplementor sfi = em.getEntityManagerFactory().unwrap(SessionFactoryImplementor.class);
+			int batchSize = NumberUtils.toInt((String)sfi.getProperties().get("hibernate.jdbc.batch_size"));
+
+			if (batchSize == 0) {
+				log.info("batch size = " + batchSize);
+			}
 			int flushCnt = 0;
 			// Do all the record inserts 
 			// this may also persist the timeseries record itself the first time it finds it
@@ -469,7 +502,7 @@ public class TimeSeries {
 			for(Series s : allSeries){
 				flushCnt += s.persistHistory(em);
 				// Flush the Entity manager context every so often to avoid excessive memory use by persistence context
-				if (flushCnt > session.getJdbcBatchSize()) {
+				if (flushCnt > batchSize) {
 					flushCnt = 0;
 					em.flush();
 					em.clear();
@@ -479,7 +512,7 @@ public class TimeSeries {
 			for(Series s : allSeries){
 				flushCnt++;
 				s.updateLatest(em);
-				if (flushCnt > session.getJdbcBatchSize()) {
+				if (flushCnt > batchSize) {
 					flushCnt = 0;
 					em.flush();
 					em.clear();
@@ -567,17 +600,22 @@ public class TimeSeries {
 		public void addHistory(SimpleRecordDto dto) throws Exception {
 			// In case of duplicates within a single push, which one is written and which
 			// one is discarded, is undefined (depends on the record sorting above)
-			if (newestTime < dto.getTimestamp()) {
+			if (newestTime >= dto.getTimestamp()) {
+				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
+						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
+						timeseries.period, dto.getTimestamp()));
+				skippedCount++;
+			} else if (timeseries.getValueTable() == null) {
+				LOG.debug(String.format("Skipping record due to unknown value type: [%s, %s, %s, %d, %d, %s]",
+						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
+						timeseries.period, dto.getTimestamp(), dto.getValue()));
+				skippedCount++;
+			} else {
 				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
 						new Date(dto.getTimestamp()));
 				rec.setProvenance(provenance);
 				measures.add(rec);
 				updateNewest(dto);
-			} else {
-				LOG.debug(String.format("Skipping record due to timestamp: [%s, %s, %s, %d, %d]",
-						timeseries.station.stationtype, timeseries.station.stationcode, timeseries.type.getCname(),
-						timeseries.period, dto.getTimestamp()));
-				skippedCount++;
 			}
 		}
 		

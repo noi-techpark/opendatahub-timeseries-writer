@@ -6,7 +6,13 @@
 package com.opendatahub.timeseries.bdp.writer.dal;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Stream;
+
+import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -96,5 +102,25 @@ public abstract class MeasurementAbstract implements Serializable {
 
 	public void setTimeseries(TimeSeries timeseries) {
 		this.timeseries = timeseries;
+	}
+
+	public static List<MeasurementAbstract> findLatest(EntityManager em, Collection<Station> stations, Collection<DataType> types) {
+		List<MeasurementAbstract> ret = new ArrayList<>();
+		ret.addAll(findLatestConcrete(Measurement.class, em, stations, types));
+		ret.addAll(findLatestConcrete(MeasurementJSON.class, em, stations, types));
+		ret.addAll(findLatestConcrete(MeasurementString.class, em, stations, types));
+		return ret;
+	}
+
+	private static <T extends MeasurementAbstract> List<T> findLatestConcrete(Class<T> clazz, EntityManager em, Collection<Station> stations, Collection<DataType> types) {
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT record FROM " + clazz.getSimpleName() + " record")
+				.addSql("JOIN record.timeseries ts")
+				.addSql("WHERE ts.station in (:stations)")
+				.addSql("AND ts.type in (:types)")
+				.setParameter("stations", stations)
+				.setParameter("types", types)
+				.buildResultList(clazz);
 	}
 }
