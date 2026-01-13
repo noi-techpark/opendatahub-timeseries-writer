@@ -4,22 +4,27 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Vector;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.hibernate.Session;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.engine.spi.SessionFactoryImplementor;
+import org.hibernate.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
@@ -60,13 +65,14 @@ public class TimeSeries {
 	@Id
 	@GeneratedValue(generator = "timeseries_gen", strategy = GenerationType.SEQUENCE)
 	@SequenceGenerator(name = "timeseries_gen", sequenceName = "timeseries_seq", allocationSize = 1)
-	@ColumnDefault(value = "nextval('timeseries_seq')")
 	protected Long id;
 
 	@ManyToOne(optional = false)
+	@Lazy
 	private Station station;
 
 	@ManyToOne(optional = false)
+	@Lazy
 	private DataType type;
 
 	@Column(nullable = false)
@@ -76,18 +82,24 @@ public class TimeSeries {
 	@Convert(converter = ValueTableConverter.class)
 	private ValueTable value_table;
 
+	@ManyToOne(cascade = CascadeType.ALL, optional = false)
+	@Lazy
+	private Partition partition;
+
 	public static enum ValueTable {
-		NUMBER("measurement", Measurement.class, MeasurementHistory.class),
-		STRING("measurementstring", MeasurementString.class, MeasurementStringHistory.class),
-		JSON("measurementjson", MeasurementJSON.class, MeasurementJSONHistory.class);
+		NUMBER("measurement", "double_value", Measurement.class, MeasurementHistory.class),
+		STRING("measurementstring", "string_value", MeasurementString.class, MeasurementStringHistory.class),
+		JSON("measurementjson", "json_value", MeasurementJSON.class, MeasurementJSONHistory.class);
 
 		public final String table;
+		public final String column;
 		public final Class<? extends MeasurementAbstract> latestClass;
 		public final Class<? extends MeasurementAbstractHistory> historyClass;
 
-		ValueTable(String table, Class<? extends MeasurementAbstract> latestClass,
+		ValueTable(String table, String column, Class<? extends MeasurementAbstract> latestClass,
 				Class<? extends MeasurementAbstractHistory> historyClass) {
 			this.table = table;
+			this.column = column;
 			this.latestClass = latestClass;
 			this.historyClass = historyClass;
 		}
@@ -114,9 +126,6 @@ public class TimeSeries {
 			return ValueTable.getByTable(dbData);
 		}
 	}
-
-	@ManyToOne(cascade = CascadeType.ALL, optional = false)
-	private Partition partition;
 
 	public TimeSeries() {
 	}
@@ -376,9 +385,8 @@ public class TimeSeries {
 			}
 			log.setProvenance(provenance);
 
-			var skippedDataTypes = new HashSet<String>();
-			int skippedCount = 0;
-			
+			log.info("Loading stations");
+			// Preload all the stations, types, latest etc. so we don't have to query for every record
 			var stations = Station.findStationsByCodes(em, stationType, dataMap.getBranch().keySet())
 				.stream()
 				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
@@ -389,10 +397,13 @@ public class TimeSeries {
 				.distinct()
 				.collect(Collectors.toSet());
 			
+			log.info("Loading types");
 			var types = DataType.findByCnames(em, typeNames)
 				.stream()
 				.collect(Collectors.toMap(DataType::getCname, Function.identity()));
 			
+			log.info("Loading latest");
+			// tree stationcode/type.cname/period/table
 			var measurements = MeasurementAbstract.findLatest(em, stations.values(), types.values())
 				.stream()
 				.collect(Collectors.groupingBy(
@@ -409,9 +420,11 @@ public class TimeSeries {
 					)
 				));
 
+			var skippedDataTypes = new HashSet<String>();
+			int skippedCount = 0;
 			List<Series> allSeries = new ArrayList<>();
 			
-			em.getTransaction().begin();
+			log.info("Loaded all stations, types, latest. Now walking tree");
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
 				Station station = stations.get((String)stationBranch.getKey());
@@ -486,38 +499,36 @@ public class TimeSeries {
 			// For that we do all the inserts and updates grouped
 			
 			// Sort the timeseries per table, because hibernate only batches per table
-			allSeries = allSeries.stream().sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
+			allSeries = allSeries.stream()
+				.filter(s -> !s.getMeasures().isEmpty())
+				.sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
 			
-			// Determine the hibernate batch size to better batch bulk operations
-			SessionFactoryImplementor sfi = em.getEntityManagerFactory().unwrap(SessionFactoryImplementor.class);
-			int batchSize = NumberUtils.toInt((String)sfi.getProperties().get("hibernate.jdbc.batch_size"));
+			log.info("Starting insert");
 
-			if (batchSize == 0) {
-				log.info("batch size = " + batchSize);
-			}
-			int flushCnt = 0;
-			// Do all the record inserts 
-			// this may also persist the timeseries record itself the first time it finds it
-			// If that turns out to be a problem, persist all the timeseries records first
-			for(Series s : allSeries){
-				flushCnt += s.persistHistory(em);
-				// Flush the Entity manager context every so often to avoid excessive memory use by persistence context
-				if (flushCnt > batchSize) {
-					flushCnt = 0;
-					em.flush();
-					em.clear();
-				}
-			}
-			// Now to all the latest updates
-			for(Series s : allSeries){
-				flushCnt++;
-				s.updateLatest(em);
-				if (flushCnt > batchSize) {
-					flushCnt = 0;
-					em.flush();
-					em.clear();
-				}
-			}
+			em.getTransaction().begin();
+			
+			// create new timeseries records using the entity manager
+			var newTimeseries = allSeries.stream()
+				.map(s -> s.timeseries)
+				.filter(t -> t.id == null)
+				.toList();
+			
+			insertNativeTimeseries(em, newTimeseries);
+			log.info("Starting measurement insert");
+			insertNativeHist(em,allSeries.stream().flatMap(s -> s.measures.stream()).toList());
+			em.flush();
+			
+			log.info("We did it!");
+
+			// Update latest
+			// for (Series s : allSeries) {
+			// 	s.updateLatest(em);
+			// 	if (flushCnt++ > batchSize) {
+			// 		em.flush();
+			// 		em.clear();
+			// 		flushCnt = 0;
+			// 	}
+			// }
 
 			em.getTransaction().commit();
 		} catch (Exception e) {
@@ -530,6 +541,61 @@ public class TimeSeries {
 			if (em.isOpen())
 				em.close();
 		}
+	}
+
+	private static void insertNativeTimeseries(EntityManager em, List<TimeSeries> tss) {
+		String sql = "INSERT INTO timeseries (station_id, type_id, period, value_table, partition_id) " +
+				"VALUES (?, ?, ?, ?, ?)";
+
+		Session session = em.unwrap(Session.class);
+		session.doWork(connection -> {
+			try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+				for (TimeSeries ts : tss) {
+					ps.setLong(1, ts.getStation().getId());
+					ps.setLong(2, ts.getType().getId());
+					ps.setInt(3, ts.getPeriod());
+					ps.setString(4, ts.getValueTable().table);
+					ps.setLong(5, ts.getPartition().getId());
+					ps.addBatch();
+				}
+
+				ps.executeBatch();
+
+				// returned IDs are in same order
+				try (ResultSet keys = ps.getGeneratedKeys()) {
+					var tsIter = tss.iterator();
+					while (keys.next()) {
+						long generatedId = keys.getLong(1);
+						tsIter.next().id = generatedId;
+					}
+				}
+			}
+		});
+	}
+
+	private static void insertNativeHist(EntityManager em, List<MeasurementAbstractHistory> tss) {
+		Session session = em.unwrap(Session.class);
+		tss.stream()
+				.collect(Collectors.groupingBy(m -> m.getTimeseries().value_table))
+				.forEach((table, recs) -> {
+					
+					String sql = "INSERT INTO " + table.table + "history (created_on, timestamp, "+table.column +", provenance_id, timeseries_id, partition_id) " +
+							"VALUES (?, ?, ?, ?, ?, ?)";
+					session.doWork(connection -> {
+						try (PreparedStatement ps = connection.prepareStatement(sql)) {
+							for (MeasurementAbstractHistory m : recs) {
+								ps.setDate(1, new java.sql.Date(m.getCreated_on().getTime()));
+								ps.setDate(2, new java.sql.Date(m.getTimestamp().getTime()));
+								ps.setObject(3, m.getValue());
+								ps.setLong(4, m.getProvenance().getId());
+								ps.setLong(5, m.getTimeseries().getId());
+								ps.setLong(6, m.getPartition().getId());
+								ps.addBatch();
+							}
+							ps.executeBatch();
+						}
+					});
+				});
 	}
 
 	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp) {
@@ -619,11 +685,8 @@ public class TimeSeries {
 			}
 		}
 		
-		public int persistHistory(EntityManager em) {
-			for(MeasurementAbstractHistory m : measures) {
-				em.persist(m);
-			}
-			return measures.size();
+		public List<MeasurementAbstractHistory> getMeasures(){
+			return measures;
 		}
 
 		private void updateLatest(EntityManager em) {

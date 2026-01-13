@@ -348,7 +348,7 @@ public class Station {
 			var allStations = findStationsByCodes(em, stationType, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
 				.stream()
 				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
-			var parents = findStationsByCodesOnly(em, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
+			var parents = findStationsByCodesOnly(em, data.stream().map(StationDto::getParentStation).collect(Collectors.toSet()))
 				.stream()
 				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
 			for (StationDto dto : data) {
@@ -407,7 +407,7 @@ public class Station {
 	 *
 	 * @throws JPAException is thrown if geographical transformation from one projection to another fails
 	 */
-	private static void sync(EntityManager em, Map<String, Station> stations,Map<String, Station> parents, StationDto dto) {
+	private static void sync(EntityManager em, Map<String, Station> stations,Map<String, Station> parents, StationDto dto) throws Exception{
 		Station existingStation = stations.get(dto.getId());
 		if (existingStation == null) {
 			existingStation = new Station();
@@ -438,8 +438,11 @@ public class Station {
 		existingStation.setOrigin(dto.getOrigin());
 		if (dto.getParentStation() != null) {
 			Station parent = parents.get(dto.getParentStation());
-			if (parent != null)
+			if (parent != null) {
 				existingStation.setParent(parent);
+			} else {
+				throw new Exception("Could not find parent station " + dto.getParentStation());
+			}
 		}
 		
 		/* We do not need to check for NULL, nor empty strings, because the writer will take care of that */

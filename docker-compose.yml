@@ -21,7 +21,7 @@ services:
         --projects client  \\
         clean install  \\
       && cd writer; mvn  \\
-        -Dspring-boot.run.jvmArguments='-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8990'  \\
+        -Dspring-boot.run.jvmArguments='-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8990 -Xmx18G'  \\
         -Dmaven.tomcat.port=${SERVER_PORT}  \\
         -Duser.home=/var/maven  \\
         -Dspring.profiles.active=${SPRING_PROFILE}  \\
