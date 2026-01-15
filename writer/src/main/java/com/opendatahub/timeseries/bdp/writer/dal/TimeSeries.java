@@ -11,21 +11,21 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Vector;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.math.NumberUtils;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
+import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
@@ -68,11 +68,9 @@ public class TimeSeries {
 	protected Long id;
 
 	@ManyToOne(optional = false)
-	@Lazy
 	private Station station;
 
 	@ManyToOne(optional = false)
-	@Lazy
 	private DataType type;
 
 	@Column(nullable = false)
@@ -83,7 +81,6 @@ public class TimeSeries {
 	private ValueTable value_table;
 
 	@ManyToOne(cascade = CascadeType.ALL, optional = false)
-	@Lazy
 	private Partition partition;
 
 	public static enum ValueTable {
@@ -385,7 +382,7 @@ public class TimeSeries {
 			}
 			log.setProvenance(provenance);
 
-			log.info("Loading stations");
+			LOG.debug("Loading stations");
 			// Preload all the stations, types, latest etc. so we don't have to query for every record
 			var stations = Station.findStationsByCodes(em, stationType, dataMap.getBranch().keySet())
 				.stream()
@@ -397,12 +394,12 @@ public class TimeSeries {
 				.distinct()
 				.collect(Collectors.toSet());
 			
-			log.info("Loading types");
+			LOG.debug("Loading types");
 			var types = DataType.findByCnames(em, typeNames)
 				.stream()
 				.collect(Collectors.toMap(DataType::getCname, Function.identity()));
 			
-			log.info("Loading latest");
+			LOG.debug("Loading latest");
 			// tree stationcode/type.cname/period/table
 			var measurements = MeasurementAbstract.findLatest(em, stations.values(), types.values())
 				.stream()
@@ -424,7 +421,7 @@ public class TimeSeries {
 			int skippedCount = 0;
 			List<Series> allSeries = new ArrayList<>();
 			
-			log.info("Loaded all stations, types, latest. Now walking tree");
+			LOG.debug("Loaded all stations, types, latest. Now walking tree");
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
 				Station station = stations.get((String)stationBranch.getKey());
@@ -503,7 +500,7 @@ public class TimeSeries {
 				.filter(s -> !s.getMeasures().isEmpty())
 				.sorted((l, r) -> l.getTable().compareTo(r.getTable())).toList();
 			
-			log.info("Starting insert");
+			LOG.debug("Starting insert");
 
 			em.getTransaction().begin();
 			
@@ -514,21 +511,14 @@ public class TimeSeries {
 				.toList();
 			
 			insertNativeTimeseries(em, newTimeseries);
-			log.info("Starting measurement insert");
+			LOG.debug("Starting measurement insert");
 			insertNativeHist(em,allSeries.stream().flatMap(s -> s.measures.stream()).toList());
 			em.flush();
 			
-			log.info("We did it!");
-
-			// Update latest
-			// for (Series s : allSeries) {
-			// 	s.updateLatest(em);
-			// 	if (flushCnt++ > batchSize) {
-			// 		em.flush();
-			// 		em.clear();
-			// 		flushCnt = 0;
-			// 	}
-			// }
+			LOG.debug("updating latest");
+			for (Series s : allSeries) {
+				s.updateLatest(em);
+			}
 
 			em.getTransaction().commit();
 		} catch (Exception e) {
@@ -545,7 +535,7 @@ public class TimeSeries {
 
 	private static void insertNativeTimeseries(EntityManager em, List<TimeSeries> tss) {
 		String sql = "INSERT INTO timeseries (station_id, type_id, period, value_table, partition_id) " +
-				"VALUES (?, ?, ?, ?, ?)";
+				"VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING";
 
 		Session session = em.unwrap(Session.class);
 		session.doWork(connection -> {
@@ -572,6 +562,8 @@ public class TimeSeries {
 			}
 		});
 	}
+	
+	private static ObjectMapper objectMapper = new ObjectMapper();
 
 	private static void insertNativeHist(EntityManager em, List<MeasurementAbstractHistory> tss) {
 		Session session = em.unwrap(Session.class);
@@ -586,13 +578,22 @@ public class TimeSeries {
 							for (MeasurementAbstractHistory m : recs) {
 								ps.setDate(1, new java.sql.Date(m.getCreated_on().getTime()));
 								ps.setDate(2, new java.sql.Date(m.getTimestamp().getTime()));
-								ps.setObject(3, m.getValue());
+								var value = m.getValue();
+								if (value instanceof Map) {
+									PGobject jsonObject = new PGobject();
+									jsonObject.setType("json");
+									jsonObject.setValue(objectMapper.writeValueAsString(value));
+									value = jsonObject;
+								} 
+								ps.setObject(3, value);
 								ps.setLong(4, m.getProvenance().getId());
 								ps.setLong(5, m.getTimeseries().getId());
 								ps.setLong(6, m.getPartition().getId());
 								ps.addBatch();
 							}
 							ps.executeBatch();
+						} catch (JsonProcessingException e) {
+							throw new RuntimeException(e);
 						}
 					});
 				});

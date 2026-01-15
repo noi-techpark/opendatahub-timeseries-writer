@@ -9,7 +9,11 @@ import java.util.Map;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import org.postgresql.util.PGobject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Indexed;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Index;
@@ -58,10 +62,9 @@ public class MeasurementJSONHistory extends MeasurementAbstractHistory {
 			this.setJsonValue(((Map<String, Object>) value));
 		}
 	}
-
+	
 	@Override
 	public Object getValue() {
 		return jsonValue;
 	}
-
 }

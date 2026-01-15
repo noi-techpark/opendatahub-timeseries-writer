@@ -16,6 +16,7 @@ import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.EntityGraph;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
@@ -113,14 +114,20 @@ public abstract class MeasurementAbstract implements Serializable {
 	}
 
 	private static <T extends MeasurementAbstract> List<T> findLatestConcrete(Class<T> clazz, EntityManager em, Collection<Station> stations, Collection<DataType> types) {
-		return QueryBuilder
-				.init(em)
-				.addSql("SELECT record FROM " + clazz.getSimpleName() + " record")
-				.addSql("JOIN record.timeseries ts")
-				.addSql("WHERE ts.station in (:stations)")
-				.addSql("AND ts.type in (:types)")
-				.setParameter("stations", stations)
-				.setParameter("types", types)
-				.buildResultList(clazz);
+		var query = em.createQuery(
+				"SELECT record FROM " + clazz.getSimpleName() + " record" +
+				" JOIN record.timeseries ts" +
+				" WHERE ts.station in (:stations)" +
+				" AND ts.type in (:types)"
+		, clazz);
+		query.setParameter("stations", stations);
+		query.setParameter("types", types);
+		EntityGraph<T> graph = em.createEntityGraph(clazz);
+		graph.addAttributeNodes("timeseries");
+		var st = graph.addSubgraph("timeseries");
+		st.addAttributeNodes("type");
+		st.addAttributeNodes("station");
+		query.setHint("jakarta.persistence.fetchgraph", graph);
+		return query.getResultList();
 	}
 }
