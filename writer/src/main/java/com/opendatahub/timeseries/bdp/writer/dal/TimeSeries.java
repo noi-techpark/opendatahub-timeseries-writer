@@ -459,19 +459,18 @@ public class TimeSeries {
 						if (!series.fits(station, type, record.getPeriod(), record.getTable())) {
 							// check if latest record (and timeseries) exists, or we create a new one
 							MeasurementAbstract latest = Optional.ofNullable(measurements)
-								.map(m -> m.get(station.stationcode))
-								.map(m -> m.get(type.getCname()))
-								.map(m -> m.get(record.getPeriod()))
-								.map(m -> m.get(record.getTable()))
-								.orElse(null);
+									.map(m -> m.get(station.stationcode))
+									.map(m -> m.get(type.getCname()))
+									.map(m -> m.get(record.getPeriod()))
+									.map(m -> m.get(record.getTable()))
+									.orElse(null);
 							if (latest != null) {
 								series = new Series(provenance, latest);
 							} else {
-								series = new Series(em, provenance, station, type, record.getPeriod(),
-										record.getTable());
-								if (record.getTable() != null) {
-									allSeries.add(series);
-								}
+								series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
+							}
+							if (record.getTable() != null) {
+								allSeries.add(series);
 							}
 						}
 
@@ -511,16 +510,6 @@ public class TimeSeries {
 				.flatMap(s -> s.measures.stream())
 				.forEach(m -> em.persist(m));
 			
-			// // create new timeseries records
-			// var newTimeseries = allSeries.stream()
-			// 	.map(s -> s.timeseries)
-			// 	.filter(t -> t.id == null)
-			// 	.toList();
-			
-			// insertNativeTimeseries(em, newTimeseries);
-			// LOG.debug("Starting measurement insert");
-			// insertNativeHist(em,allSeries.stream().flatMap(s -> s.measures.stream()).toList());
-			
 			LOG.debug("updating latest");
 			for (Series s : allSeries) {
 				s.updateLatest(em);
@@ -538,72 +527,6 @@ public class TimeSeries {
 			if (em.isOpen())
 				em.close();
 		}
-	}
-
-	private static void insertNativeTimeseries(EntityManager em, List<TimeSeries> tss) {
-		String sql = "INSERT INTO timeseries (station_id, type_id, period, value_table, partition_id) " +
-				"VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING";
-
-		Session session = em.unwrap(Session.class);
-		session.doWork(connection -> {
-			try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-				for (TimeSeries ts : tss) {
-					ps.setLong(1, ts.getStation().getId());
-					ps.setLong(2, ts.getType().getId());
-					ps.setInt(3, ts.getPeriod());
-					ps.setString(4, ts.getValueTable().table);
-					ps.setLong(5, ts.getPartition().getId());
-					ps.addBatch();
-				}
-
-				ps.executeBatch();
-
-				// returned IDs are in same order
-				try (ResultSet keys = ps.getGeneratedKeys()) {
-					var tsIter = tss.iterator();
-					while (keys.next()) {
-						long generatedId = keys.getLong(1);
-						tsIter.next().id = generatedId;
-					}
-				}
-			}
-		});
-	}
-	
-	private static ObjectMapper objectMapper = new ObjectMapper();
-
-	private static void insertNativeHist(EntityManager em, List<MeasurementAbstractHistory> tss) {
-		Session session = em.unwrap(Session.class);
-		tss.stream()
-				.collect(Collectors.groupingBy(m -> m.getTimeseries().value_table))
-				.forEach((table, recs) -> {
-					
-					String sql = "INSERT INTO " + table.table + "history (created_on, timestamp, "+table.column +", provenance_id, timeseries_id, partition_id) " +
-							"VALUES (?, ?, ?, ?, ?, ?)";
-					session.doWork(connection -> {
-						try (PreparedStatement ps = connection.prepareStatement(sql)) {
-							for (MeasurementAbstractHistory m : recs) {
-								ps.setDate(1, new java.sql.Date(m.getCreated_on().getTime()));
-								ps.setDate(2, new java.sql.Date(m.getTimestamp().getTime()));
-								var value = m.getValue();
-								if (value instanceof Map) {
-									PGobject jsonObject = new PGobject();
-									jsonObject.setType("json");
-									jsonObject.setValue(objectMapper.writeValueAsString(value));
-									value = jsonObject;
-								} 
-								ps.setObject(3, value);
-								ps.setLong(4, m.getProvenance().getId());
-								ps.setLong(5, m.getTimeseries().getId());
-								ps.setLong(6, m.getPartition().getId());
-								ps.addBatch();
-							}
-							ps.executeBatch();
-						} catch (JsonProcessingException e) {
-							throw new RuntimeException(e);
-						}
-					});
-				});
 	}
 
 	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp) {
@@ -645,14 +568,17 @@ public class TimeSeries {
 		}
 
 		public boolean fits(Station station, DataType type, Integer period, ValueTable table) {
-			return station == timeseries.station && type == timeseries.getType() && period == timeseries.period
-					&& table == timeseries.getValueTable();
+			return station.getId().equals(timeseries.station.getId()) 
+				&& type.getId().equals(timeseries.getType().getId()) 
+				&& period.equals(timeseries.period)
+				&& table.equals(timeseries.getValueTable());
 		}
 
 		public Series(Provenance provenance, MeasurementAbstract latest) {
 			this.provenance = provenance;
 			timeseries = latest.getTimeseries();
 			this.latest = latest;
+			newestTime = latest.getTimestamp().getTime();
 			newest = null;
 		}
 
