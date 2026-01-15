@@ -31,7 +31,7 @@ services:
       - "${SERVER_PORT}:${SERVER_PORT}"
       - 8990:8990
     volumes:
-      - ./m2:/var/maven/.m2
+      - ./.m2:/var/maven/.m2
       - ./:/code
     working_dir: /code
     tty: true

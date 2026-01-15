@@ -9,12 +9,10 @@ import static net.logstash.logback.argument.StructuredArguments.v;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import org.geotools.api.geometry.MismatchedDimensionException;
@@ -32,10 +30,11 @@ import org.locationtech.jts.geom.PrecisionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -110,7 +109,7 @@ public class Station {
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "station", fetch = FetchType.LAZY)
 	private Collection<MetaData> metaDataHistory;
 
-	@OneToOne
+	@OneToOne(fetch = FetchType.LAZY)
 	private MetaData metaData;
 
 	public Station() {
@@ -146,7 +145,6 @@ public class Station {
 		}
 		return stationList;
 	}
-
 
 	private static StationDto convertToDto(Station s) {
 		Double x = null;

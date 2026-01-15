@@ -72,7 +72,7 @@ public class DataType {
 	@OneToMany(cascade = CascadeType.ALL, mappedBy = "type", fetch = FetchType.LAZY)
 	private Collection<DataTypeMetaData> metaDataHistory = new ArrayList<>();
 
-	@OneToOne(cascade = CascadeType.PERSIST)
+	@OneToOne(cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)
 	private DataTypeMetaData metaData;
 
 	public DataType() {

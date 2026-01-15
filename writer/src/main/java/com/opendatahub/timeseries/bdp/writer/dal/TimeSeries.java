@@ -21,8 +21,6 @@ import org.hibernate.Session;
 import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -503,22 +501,31 @@ public class TimeSeries {
 			LOG.debug("Starting insert");
 
 			em.getTransaction().begin();
-			
-			// create new timeseries records using the entity manager
-			var newTimeseries = allSeries.stream()
+
+			allSeries.stream()
 				.map(s -> s.timeseries)
 				.filter(t -> t.id == null)
-				.toList();
+				.forEach(t -> em.persist(t));
 			
-			insertNativeTimeseries(em, newTimeseries);
-			LOG.debug("Starting measurement insert");
-			insertNativeHist(em,allSeries.stream().flatMap(s -> s.measures.stream()).toList());
-			em.flush();
+			allSeries.stream()
+				.flatMap(s -> s.measures.stream())
+				.forEach(m -> em.persist(m));
+			
+			// // create new timeseries records
+			// var newTimeseries = allSeries.stream()
+			// 	.map(s -> s.timeseries)
+			// 	.filter(t -> t.id == null)
+			// 	.toList();
+			
+			// insertNativeTimeseries(em, newTimeseries);
+			// LOG.debug("Starting measurement insert");
+			// insertNativeHist(em,allSeries.stream().flatMap(s -> s.measures.stream()).toList());
 			
 			LOG.debug("updating latest");
 			for (Series s : allSeries) {
 				s.updateLatest(em);
 			}
+			LOG.debug("committing");
 
 			em.getTransaction().commit();
 		} catch (Exception e) {
