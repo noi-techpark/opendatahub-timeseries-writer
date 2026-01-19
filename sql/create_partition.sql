@@ -5,6 +5,7 @@
 DO $$
 DECLARE
   -- Define your partitions here
+/*
   v_partitions CONSTANT JSONB := '[
     {"name": "a22-traffic", "origin": "A22", "station_types": ["TrafficSensor", "TrafficDirection"]},
 	{"name": "a22-environment", "origin": "a22-algorab", "station_types": null},
@@ -15,6 +16,12 @@ DECLARE
 	{"name": "ummadum", "origin": "UMMADUM", "station_types": null},
 	{"name": "echarging", "origin": null, "station_types": ["EChargingStation", "EChargingPlug"]},
     {"name": "meteo", "origin": null, "station_types": ["MeteoStation", "WeatherForecast"]}
+  ]'::JSONB;
+*/
+
+  v_partitions CONSTANT JSONB := '[
+	{"name": "alpsgo", "origin": "AlpsGo", "station_types": []},
+	{"name": "ummadum", "origin": "UMMADUM", "station_types": []}
   ]'::JSONB;
 
   v_partition JSONB;
@@ -43,6 +50,7 @@ BEGIN
     -- Create partition entry and get ID
     INSERT INTO "partition" (name, description)
     VALUES (v_partition_name, v_partition_name)
+	on conflict do nothing
     RETURNING id INTO v_partition_id;
 
     RAISE NOTICE 'Created partition % with ID %', v_partition_name, v_partition_id;
@@ -50,25 +58,29 @@ BEGIN
     -- Create partition definitions
     IF v_station_types IS NULL AND v_origin IS NOT NULL THEN
       INSERT INTO partition_def(partition_id, origin, stationtype)
-      VALUES (v_partition_id, v_origin, NULL);
+      VALUES (v_partition_id, v_origin, NULL)
+	  on conflict do nothing;
       
     ELSIF v_origin IS NULL AND v_station_types IS NOT NULL THEN
       FOREACH v_station_type IN ARRAY v_station_types
       LOOP
         INSERT INTO partition_def(partition_id, origin, stationtype)
-        VALUES (v_partition_id, NULL, v_station_type);
+        VALUES (v_partition_id, NULL, v_station_type)
+	    on conflict do nothing;
       END LOOP;
       
     ELSIF v_origin IS NOT NULL AND v_station_types IS NOT NULL THEN
       FOREACH v_station_type IN ARRAY v_station_types
       LOOP
         INSERT INTO partition_def(partition_id, origin, stationtype)
-        VALUES (v_partition_id, v_origin, v_station_type);
+        VALUES (v_partition_id, v_origin, v_station_type)
+        on conflict do nothing;
       END LOOP;
       
     ELSE
       INSERT INTO partition_def(partition_id, origin, stationtype)
-      VALUES (v_partition_id, NULL, NULL);
+      VALUES (v_partition_id, NULL, NULL)
+      on conflict do nothing;
     END IF;
 
     -- Create partition tables
