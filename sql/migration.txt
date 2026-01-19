@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: CC0-1.0
 
 - scale up to m7i.4xlarge
-- increase storage size to +50% of occupied (to determine)
+- increase storage size to +50% of occupied (to determine) (went down to 250 remaining with 2100GB, 2 TB should be fine)
 - timeseries_prepare.sql
 - stop 
 	- bluetooth elaboration
