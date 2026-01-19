@@ -89,49 +89,6 @@ jobs:
           aws-eks-cluster-name: aws-main-eu-01
           aws-region: eu-west-1
 
-  # Deploy Partition
-  deploy-partition:
-    runs-on: ubuntu-24.04
-    if: github.ref == 'refs/heads/feat/partition'
-    needs: test
-    environment: test
-    concurrency: deploy-partition
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v2
-
-      - name: Build project
-        uses: noi-techpark/github-actions/maven-build@v2
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          build-command: 'mvn -B -DskipTests -DfinalName=bdp --projects writer --also-make clean package'
-
-      - name: Build and push images
-        uses: noi-techpark/github-actions/docker-build-and-push@v2
-        with:
-          docker-username: ${{ github.actor }}
-          docker-password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Customize values.yaml
-        run: |
-          yq -i '
-            .image.repository="${{ env.DOCKER_IMAGE }}" |
-            .image.tag="${{ env.DOCKER_TAG }}" |
-            .image.pullPolicy="IfNotPresent" 
-          ' infrastructure/helm/partition.yaml
-    
-      - name: Deploy on cluster  
-        uses: noi-techpark/github-actions/helm-deploy@v2
-        with:
-          k8s-name: bdp-core
-          k8s-namespace: partition
-          chart-path: infrastructure/helm/bdp-core
-          values-file: infrastructure/helm/partition.yaml
-          aws-access-key-id: ${{ secrets[vars.AWS_KEY_ID] }}
-          aws-secret-access-key: ${{ secrets[vars.AWS_KEY_SECRET] }}
-          aws-eks-cluster-name: aws-main-eu-01
-          aws-region: eu-west-1
-
   # Deploy Prod
   deploy-prod:
     runs-on: ubuntu-24.04
