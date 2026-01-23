@@ -5,7 +5,6 @@
 DO $$
 DECLARE
   -- Define your partitions here
-/*
   v_partitions CONSTANT JSONB := '[
     {"name": "a22-traffic", "origin": "A22", "station_types": ["TrafficSensor", "TrafficDirection"]},
 	{"name": "a22-environment", "origin": "a22-algorab", "station_types": null},
@@ -16,12 +15,6 @@ DECLARE
 	{"name": "ummadum", "origin": "UMMADUM", "station_types": null},
 	{"name": "echarging", "origin": null, "station_types": ["EChargingStation", "EChargingPlug"]},
     {"name": "meteo", "origin": null, "station_types": ["MeteoStation", "WeatherForecast"]}
-  ]'::JSONB;
-*/
-
-  v_partitions CONSTANT JSONB := '[
-	{"name": "alpsgo", "origin": "AlpsGo", "station_types": []},
-	{"name": "ummadum", "origin": "UMMADUM", "station_types": []}
   ]'::JSONB;
 
   v_partition JSONB;
@@ -38,20 +31,22 @@ BEGIN
   LOOP
     v_partition_name := v_partition->>'name';
     v_origin := v_partition->>'origin';
-    v_station_types := CASE 
-      WHEN v_partition->'station_types' IS NOT NULL 
-      THEN ARRAY(SELECT jsonb_array_elements_text(v_partition->'station_types'))
-      ELSE NULL
-    END;
+	v_station_types := CASE 
+	  WHEN v_partition->'station_types' IS NOT NULL 
+	       AND jsonb_array_length(v_partition->'station_types') > 0
+	  THEN ARRAY(SELECT jsonb_array_elements_text(v_partition->'station_types'))
+	  ELSE NULL
+	END;
+
     v_total_timeseries := 0;
 
     RAISE NOTICE '=== Processing partition: % ===', v_partition_name;
 
     -- Create partition entry and get ID
-    INSERT INTO "partition" (name, description)
-    VALUES (v_partition_name, v_partition_name)
-	on conflict do nothing
-    RETURNING id INTO v_partition_id;
+	INSERT INTO "partition" (name, description)
+	VALUES (v_partition_name, v_partition_name)
+	ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+	RETURNING id INTO v_partition_id;
 
     RAISE NOTICE 'Created partition % with ID %', v_partition_name, v_partition_id;
 
@@ -76,7 +71,6 @@ BEGIN
         VALUES (v_partition_id, v_origin, v_station_type)
         on conflict do nothing;
       END LOOP;
-      
     ELSE
       INSERT INTO partition_def(partition_id, origin, stationtype)
       VALUES (v_partition_id, NULL, NULL)
@@ -135,6 +129,7 @@ BEGIN
       END IF;
     END LOOP;
 
+	COMMIT;
     RAISE NOTICE 'Completed partition %: Processed % timeseries', v_partition_name, v_total_timeseries;
   END LOOP;
 
