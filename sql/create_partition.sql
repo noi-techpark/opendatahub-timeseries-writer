@@ -39,102 +39,100 @@ BEGIN
            AND jsonb_array_length(v_partition->'station_types') > 0
       THEN ARRAY(SELECT jsonb_array_elements_text(v_partition->'station_types'))
       ELSE NULL
-  END;
+    END;
 
-  v_total_timeseries := 0;
+    v_total_timeseries := 0;
 
-  RAISE NOTICE '=== Processing partition: % ===', v_partition_name;
+    RAISE NOTICE '=== Processing partition: % ===', v_partition_name;
 
-    -- Create partition entry and get ID
-  INSERT INTO "partition" (name, description)
-  VALUES (v_partition_name, v_partition_name)
-  ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-  RETURNING id INTO v_partition_id;
+      -- Create partition entry and get ID
+    INSERT INTO "partition" (name, description)
+    VALUES (v_partition_name, v_partition_name)
+    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO v_partition_id;
 
-  RAISE NOTICE 'Created partition % with ID %', v_partition_name, v_partition_id;
-
-  -- Create partition definitions
-  IF v_station_types IS NULL AND v_origin IS NOT NULL THEN
-    INSERT INTO partition_def(partition_id, origin, stationtype)
-    VALUES (v_partition_id, v_origin, NULL)
-  on conflict do nothing;
-
-  ELSIF v_origin IS NULL AND v_station_types IS NOT NULL THEN
-    FOREACH v_station_type IN ARRAY v_station_types
-    LOOP
+    -- Create partition definitions
+    IF v_station_types IS NULL AND v_origin IS NOT NULL THEN
       INSERT INTO partition_def(partition_id, origin, stationtype)
-      VALUES (v_partition_id, NULL, v_station_type)
+      VALUES (v_partition_id, v_origin, NULL)
     on conflict do nothing;
-    END LOOP;
 
-  ELSIF v_origin IS NOT NULL AND v_station_types IS NOT NULL THEN
-    FOREACH v_station_type IN ARRAY v_station_types
-    LOOP
-      INSERT INTO partition_def(partition_id, origin, stationtype)
-      VALUES (v_partition_id, v_origin, v_station_type)
+    ELSIF v_origin IS NULL AND v_station_types IS NOT NULL THEN
+      FOREACH v_station_type IN ARRAY v_station_types
+      LOOP
+        INSERT INTO partition_def(partition_id, origin, stationtype)
+        VALUES (v_partition_id, NULL, v_station_type)
       on conflict do nothing;
-    END LOOP;
-  ELSE
-    INSERT INTO partition_def(partition_id, origin, stationtype)
-    VALUES (v_partition_id, NULL, NULL)
-    on conflict do nothing;
-  END IF;
+      END LOOP;
 
-  -- Create partition tables
-  EXECUTE format('CREATE TABLE IF NOT EXISTS measurementhistory_%s PARTITION OF measurementhistory FOR VALUES IN (%s)',
-                 v_partition_id, v_partition_id);
-  EXECUTE format('CREATE TABLE IF NOT EXISTS measurementstringhistory_%s PARTITION OF measurementstringhistory FOR VALUES IN (%s)',
-                 v_partition_id, v_partition_id);
-  EXECUTE format('CREATE TABLE IF NOT EXISTS measurementjsonhistory_%s PARTITION OF measurementjsonhistory FOR VALUES IN (%s)',
-                 v_partition_id, v_partition_id);
-
-  -- Update timeseries
-  UPDATE timeseries ts
-  SET partition_id = v_partition_id
-  FROM station s
-  WHERE s.id = ts.station_id
-    AND (v_origin IS NULL OR s.origin = v_origin)
-    AND (v_station_types IS NULL OR s.stationtype = ANY(v_station_types))
-    AND ts.partition_id != v_partition_id;
-
-  RAISE NOTICE 'Updated timeseries partition_id';
-
-  -- Migrate history data
-  FOR v_ts_record IN
-    SELECT id, value_table, partition_id
-    FROM timeseries
-    WHERE partition_id = v_partition_id
-  LOOP
-    v_total_timeseries := v_total_timeseries + 1;
-
-    CASE v_ts_record.value_table
-      WHEN 'measurementstring' THEN
-        UPDATE measurementstringhistory h
-        SET partition_id = v_ts_record.partition_id
-        WHERE h.timeseries_id = v_ts_record.id
-          AND h.partition_id != v_ts_record.partition_id;
-
-      WHEN 'measurementjson' THEN
-        UPDATE measurementjsonhistory h
-        SET partition_id = v_ts_record.partition_id
-        WHERE h.timeseries_id = v_ts_record.id
-          AND h.partition_id != v_ts_record.partition_id;
-
-      WHEN 'measurement' THEN
-        UPDATE measurementhistory h
-        SET partition_id = v_ts_record.partition_id
-        WHERE h.timeseries_id = v_ts_record.id
-          AND h.partition_id != v_ts_record.partition_id;
-    END CASE;
-
-    IF v_total_timeseries % 100 = 0 THEN
-      RAISE NOTICE 'Processed % timeseries', v_total_timeseries;
+    ELSIF v_origin IS NOT NULL AND v_station_types IS NOT NULL THEN
+      FOREACH v_station_type IN ARRAY v_station_types
+      LOOP
+        INSERT INTO partition_def(partition_id, origin, stationtype)
+        VALUES (v_partition_id, v_origin, v_station_type)
+        on conflict do nothing;
+      END LOOP;
+    ELSE
+      INSERT INTO partition_def(partition_id, origin, stationtype)
+      VALUES (v_partition_id, NULL, NULL)
+      on conflict do nothing;
     END IF;
-  END LOOP;
 
-  COMMIT;
+    -- Create partition tables
+    EXECUTE format('CREATE TABLE IF NOT EXISTS measurementhistory_%s PARTITION OF measurementhistory FOR VALUES IN (%s)',
+                   v_partition_id, v_partition_id);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS measurementstringhistory_%s PARTITION OF measurementstringhistory FOR VALUES IN (%s)',
+                   v_partition_id, v_partition_id);
+    EXECUTE format('CREATE TABLE IF NOT EXISTS measurementjsonhistory_%s PARTITION OF measurementjsonhistory FOR VALUES IN (%s)',
+                   v_partition_id, v_partition_id);
+
+    COMMIT;
+    RAISE NOTICE 'Created partition % with ID %', v_partition_name, v_partition_id;
+    RAISE NOTICE 'Updating existing timeseries';
+    
+    -- migrate one timeseries at a time
+    FOR v_ts_record IN SELECT ts.id, value_table from timeseries ts
+      JOIN station s on s.id = ts.station_id
+      WHERE (v_origin IS NULL OR s.origin = v_origin)
+        AND (v_station_types IS NULL OR s.stationtype = ANY(v_station_types))
+        AND ts.partition_id != v_partition_id
+    LOOP
+      -- Update timeseries
+      UPDATE timeseries ts
+        SET partition_id = v_partition_id
+        WHERE ts.id = v_ts_record.id;
+
+      CASE v_ts_record.value_table
+        WHEN 'measurementstring' THEN
+          UPDATE measurementstringhistory h
+          SET partition_id = v_partition_id
+          WHERE h.timeseries_id = v_ts_record.id
+            AND h.partition_id != v_partition_id;
+
+        WHEN 'measurementjson' THEN
+          UPDATE measurementjsonhistory h
+          SET partition_id = v_partition_id
+          WHERE h.timeseries_id = v_ts_record.id
+            AND h.partition_id != v_partition_id;
+
+        WHEN 'measurement' THEN
+          UPDATE measurementhistory h
+          SET partition_id = v_partition_id
+          WHERE h.timeseries_id = v_ts_record.id
+            AND h.partition_id != v_partition_id;
+      END CASE;
+
+      COMMIT;
+
+      v_total_timeseries := v_total_timeseries + 1;
+      IF v_total_timeseries % 100 = 0 THEN
+        RAISE NOTICE 'Processed % timeseries', v_total_timeseries;
+      END IF;
+    END LOOP;
+
     RAISE NOTICE 'Completed partition %: Processed % timeseries', v_partition_name, v_total_timeseries;
   END LOOP;
 
   RAISE NOTICE '=== All partitions completed ===';
+     
 END $$;
