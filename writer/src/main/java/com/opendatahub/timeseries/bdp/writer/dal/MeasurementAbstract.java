@@ -10,9 +10,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Stream;
-
-import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
