@@ -89,6 +89,7 @@ BEGIN
     COMMIT;
     RAISE NOTICE 'Created partition % with ID %', v_partition_name, v_partition_id;
     RAISE NOTICE 'Updating existing timeseries';
+    select now();
     
     -- migrate one timeseries at a time
     FOR v_ts_record IN SELECT ts.id, value_table from timeseries ts
@@ -101,6 +102,8 @@ BEGIN
       UPDATE timeseries ts
         SET partition_id = v_partition_id
         WHERE ts.id = v_ts_record.id;
+
+      COMMIT;
 
       CASE v_ts_record.value_table
         WHEN 'measurementstring' THEN
@@ -127,11 +130,35 @@ BEGIN
       v_total_timeseries := v_total_timeseries + 1;
       IF v_total_timeseries % 100 = 0 THEN
         RAISE NOTICE 'Processed % timeseries', v_total_timeseries;
+        select now();
       END IF;
     END LOOP;
 
     RAISE NOTICE 'Completed partition %: Processed % timeseries', v_partition_name, v_total_timeseries;
+    select now();
   END LOOP;
+   
+  RAISE NOTICE '=== Cleaning up orphaned records ==='
+  select now();
+
+  -- wait for possible race conditions with API writing to wrong partition, then clean up mismatching timeseries/history partitions (should be 0)
+  select pg_sleep(30);
+  
+  update measurementhistory h
+    set partition_id = t.partition_id
+    from timeseries t 
+    where t.id = h.timeseries_id
+    and t.partition_id <> h.partition_id;
+  update measurementstringhistory h
+    set partition_id = t.partition_id
+    from timeseries t 
+    where t.id = h.timeseries_id
+    and t.partition_id <> h.partition_id;
+  update measurementjsonhistory h
+    set partition_id = t.partition_id
+    from timeseries t 
+    where t.id = h.timeseries_id
+    and t.partition_id <> h.partition_id;
 
   RAISE NOTICE '=== All partitions completed ===';
      
