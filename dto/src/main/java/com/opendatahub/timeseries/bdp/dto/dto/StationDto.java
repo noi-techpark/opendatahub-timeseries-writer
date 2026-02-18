@@ -62,6 +62,9 @@ public class StationDto implements Serializable {
 	@JsonPropertyDescription("Station code to which this station belongs (ex., bz:noi)")
 	private String parentStation;
 
+	@JsonPropertyDescription("Station type of parent station")
+	private String parentStationType;
+
 	@JsonPropertyDescription("Meta data, that describes this station (can be any valid JSON string)")
 	private Map<String, Object> metaData = new HashMap<>();
 
@@ -96,6 +99,14 @@ public class StationDto implements Serializable {
 
 	public void setParentStation(String parentId) {
 		this.parentStation = parentId;
+	}
+
+	public String getParentStationType() {
+		return parentStationType;
+	}
+
+	public void setParentStationType(String type) {
+		this.parentStationType = type;
 	}
 
 	public String getName() {
