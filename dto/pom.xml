@@ -11,7 +11,7 @@ SPDX-License-Identifier: GPL-3.0-only
 	<parent>
         <groupId>com.opendatahub.timeseries.bdp</groupId>
         <artifactId>core</artifactId>
-		<version>9.1.0</version>
+		<version>9.2.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
