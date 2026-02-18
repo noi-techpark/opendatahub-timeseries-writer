@@ -144,6 +144,10 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
 
     @AfterEach
     public void cleanup() {
+        if (em != null && em.isOpen()) {
+            em.clear();
+            em.close();
+        }
         em = entityManagerFactory.createEntityManager();
         try {
             em.getTransaction().begin();

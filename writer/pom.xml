@@ -12,7 +12,7 @@ SPDX-License-Identifier: CC0-1.0
 	<parent>
 		<groupId>com.opendatahub.timeseries.bdp</groupId>
 		<artifactId>core</artifactId>
-		<version>9.0.0</version>
+		<version>9.1.0</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -96,7 +96,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>com.opendatahub.timeseries.bdp</groupId>
 			<artifactId>dto</artifactId>
-			<version>9.0.0</version>
+			<version>9.1.0</version>
 		</dependency>
 
 		<!-- DB migration - Flyway -->

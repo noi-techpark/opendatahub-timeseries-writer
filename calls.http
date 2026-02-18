@@ -107,7 +107,7 @@ POST {{host}}/json/syncStations/EChargingStation34
 &prv=11111
 &syncState=true
 &onlyActivation=true
-&origin=Test123
+&origin=origin
 Content-Type: application/json
 Authorization: Bearer {{authtoken}}
 
@@ -115,8 +115,29 @@ Authorization: Bearer {{authtoken}}
 	{
 		"name": "PETER",
 		"id": "PETER",
-		"stationType": "EChargingStation",
+		"stationType": "EChargingStation34",
 		"origin": "abc"
+	}
+]
+
+### Post a child station
+POST {{host}}/json/syncStations/ChildStation
+?prn=test
+&prv=11111
+&syncState=true
+&onlyActivation=true
+&origin=origin
+Content-Type: application/json
+Authorization: Bearer {{authtoken}}
+
+[
+	{
+		"name": "child",
+		"id": "child",
+		"stationType": "ChildStation",
+		"origin": "abc",
+    "parentStation": "PETER",
+    "parentStationType": "EChargingStation34"
 	}
 ]
 

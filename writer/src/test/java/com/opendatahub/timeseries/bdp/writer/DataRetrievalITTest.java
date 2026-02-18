@@ -5,6 +5,7 @@
 
 package com.opendatahub.timeseries.bdp.writer;
 
+import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -133,6 +134,57 @@ public class DataRetrievalITTest extends WriterSetupTest {
 				true,
 				false);
 		assertEquals(HttpStatus.CREATED, result.getStatusCode());
+	}
+
+	@Test
+	public void testParentStations() {
+		List<StationDto> stations = new ArrayList<StationDto>();
+		stations.add(new StationDto("parent", "Some name 1", null, null));
+		ResponseEntity<Object> result = dataManager.syncStations(
+				"Parent",
+				stations,
+				null,
+				"testProvenance",
+				"testProvenanceVersion",
+				true,
+				false);
+		assertEquals(HttpStatus.CREATED, result.getStatusCode());
+
+		stations = new ArrayList<StationDto>();
+		var s = new StationDto("child", "Some name 1", null, null);
+		s.setParentStation("parent");
+		s.setParentStationType("Parent");
+		stations.add(s);
+		result = dataManager.syncStations(
+				"Child",
+				stations,
+				null,
+				"testProvenance",
+				"testProvenanceVersion",
+				true,
+				false);
+		assertEquals(HttpStatus.CREATED, result.getStatusCode());
+		var found = Station.findStation(em, "Child", "child");
+		assertEquals(found.getParent().getStationcode(), "parent");
+
+		stations = new ArrayList<StationDto>();
+		s = new StationDto("child", "Some name 1", null, null);
+		s.setParentStation("parent");
+		s.setParentStationType("ParentWRONG");
+		stations.add(s);
+		try{
+		result = dataManager.syncStations(
+				"Child",
+				stations,
+				null,
+				"testProvenance",
+				"testProvenanceVersion",
+				true,
+				false);
+			fail();
+		} catch (Exception e) {
+			assertEquals(e.getMessage(), "Could not find parent station parent of type ParentWRONG");
+		}
 	}
 
 	@Test

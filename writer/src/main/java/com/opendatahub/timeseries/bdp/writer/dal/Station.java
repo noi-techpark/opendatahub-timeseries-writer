@@ -341,14 +341,14 @@ public class Station {
 			return;
 		}
 		List<String> stationCodes = new ArrayList<>();
-		em.getTransaction().begin();
 		try {
+			em.getTransaction().begin();
 			var allStations = findStationsByCodes(em, stationType, data.stream().map(StationDto::getId).collect(Collectors.toSet()))
 				.stream()
 				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
-			var parents = findStationsByCodesOnly(em, data.stream().map(StationDto::getParentStation).collect(Collectors.toSet()))
-				.stream()
-				.collect(Collectors.toMap(Station::getStationcode, Function.identity()));
+			
+			Map<String, Map<String, Station>> allParents = getAllParents(em, data);
+
 			for (StationDto dto : data) {
 				if (dto.getStationType() == null) {
 					dto.setStationType(stationType);
@@ -362,7 +362,7 @@ public class Station {
 								dto.getId(),
 								v("StationDto", dto));
 					} else {
-						sync(em, allStations, parents, dto);
+						sync(em, allStations, allParents, dto);
 						stationCodes.add(dto.getId());
 					}
 				} else {
@@ -384,8 +384,8 @@ public class Station {
 		}
 		if (syncState) {
 			String origin = data.get(0).getOrigin();
-			em.getTransaction().begin();
 			try {
+				em.getTransaction().begin();
 				syncStationStates(em, stationType, origin, stationCodes, provenanceName, provenanceVersion, onlyActivation);
 				em.getTransaction().commit();
 			} catch (Exception e) {
@@ -398,6 +398,45 @@ public class Station {
 		}
 	}
 
+	/* 
+		Load all referenced stations as a tree of type / code / station
+
+		Previously, the parent station references did not have a type, only a code.
+		This lead to duplicate key issues because stationcodes are only unique per type
+		A new field parentStationType was introduced, but we still keep the old behavior for compatibility
+		
+		In case the old behavior triggers, the top level type is an empty string
+	 */
+	private static Map<String, Map<String, Station>> getAllParents(EntityManager em, List<StationDto> data) {
+		var parentsHasType = data.stream()
+		.collect(Collectors.partitioningBy(
+			s -> s.getParentStationType() != null && !s.getParentStationType().isEmpty()
+		));
+		
+		Map<String, Map<String, Station>> allParents = parentsHasType.get(true).stream()
+				.collect(Collectors.groupingBy(
+						StationDto::getParentStationType,
+						Collectors.mapping(StationDto::getParentStation, Collectors.toSet())))
+				.entrySet().stream()
+				.flatMap(e -> findStationsByCodes(em, e.getKey(), e.getValue()).stream())
+				// group them into a map by type
+				.collect(Collectors.groupingBy(
+						Station::getStationtype,
+						Collectors.toMap(Station::getStationcode, Function.identity())));
+		
+		// If no parent reference has a type, switch to the old behavior and search by code only
+		if (parentsHasType.get(true).isEmpty() && !parentsHasType.get(false).isEmpty()) {
+			// find all stations where we only have code
+			allParents = Map.of("", findStationsByCodesOnly(em,
+					parentsHasType.get(false).stream()
+							.map(StationDto::getParentStation)
+							.collect(Collectors.toSet()))
+					.stream()
+					.collect(Collectors.toMap(Station::getStationcode, Function.identity())));
+		}
+		return allParents;
+	}
+
 
 	/**
 	 * @param em entity manager
@@ -405,7 +444,7 @@ public class Station {
 	 *
 	 * @throws JPAException is thrown if geographical transformation from one projection to another fails
 	 */
-	private static void sync(EntityManager em, Map<String, Station> stations,Map<String, Station> parents, StationDto dto) throws Exception{
+	private static void sync(EntityManager em, Map<String, Station> stations, Map<String, Map<String,Station>> parents, StationDto dto) throws Exception{
 		Station existingStation = stations.get(dto.getId());
 		if (existingStation == null) {
 			existingStation = new Station();
@@ -435,11 +474,21 @@ public class Station {
 		}
 		existingStation.setOrigin(dto.getOrigin());
 		if (dto.getParentStation() != null) {
-			Station parent = parents.get(dto.getParentStation());
+			Station parent = null; 
+			
+			// The parents are a cache, where we look up all parents in a single batch beforehand
+			// set up in a type / code / station tree
+			// Note that the type is not necessarily the type of the station in the database, but the type that was specified when looking it up,
+			// mirroring this get() logic here
+			var parentsOfType = parents.get(dto.getParentStationType() == null ? "" : dto.getParentStationType());
+			if (parentsOfType != null) {
+				parent = parentsOfType.get(dto.getParentStation());
+			}
+
 			if (parent != null) {
 				existingStation.setParent(parent);
 			} else {
-				throw new Exception("Could not find parent station " + dto.getParentStation());
+				throw new Exception("Could not find parent station " + dto.getParentStation() + " of type " + dto.getParentStationType());
 			}
 		}
 		
