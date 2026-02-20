@@ -445,8 +445,13 @@ public class TimeSeries {
 					// the same type
 					// timestamp sort to discard duplicate timestamps (because we compare against
 					// the running latest)
-					var simpleRecords = dataRecords.stream()
+					List<RecordBurrito> simpleRecords = dataRecords.stream()
 							.map((r) -> new RecordBurrito((SimpleRecordDto) r))
+							.peek(r -> {
+								if (r.getTable() == null || r.getPeriod() == null || r.getTimestamp() == null){
+									throw new IllegalStateException("Null field or invalid data type in Record: " + r);
+								}
+							})
 							.sorted(Comparator.comparing(RecordBurrito::getTable)
 									.thenComparing(RecordBurrito::getPeriod)
 									.thenComparing(RecordBurrito::getTimestamp))
