@@ -22,7 +22,6 @@ import com.fasterxml.jackson.module.jsonSchema.JsonSchema;
 import com.fasterxml.jackson.module.jsonSchema.factories.SchemaFactoryWrapper;
 import com.opendatahub.timeseries.bdp.dto.dto.ExceptionDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
-import com.opendatahub.timeseries.bdp.writer.dal.util.Log;
 
 import jakarta.persistence.PersistenceException;
 import jakarta.servlet.http.HttpServletRequest;

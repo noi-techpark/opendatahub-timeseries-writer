@@ -15,6 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.hibernate.annotations.ColumnDefault;
+
+import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
+import com.opendatahub.timeseries.bdp.dto.dto.TypeDto;
+import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
+import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -28,13 +35,6 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-
-import org.hibernate.annotations.ColumnDefault;
-
-import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
-import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.TypeDto;
 
 
 /**

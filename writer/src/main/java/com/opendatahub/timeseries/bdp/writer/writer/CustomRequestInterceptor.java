@@ -4,14 +4,13 @@
 
 package com.opendatahub.timeseries.bdp.writer.writer;
 
+import static net.logstash.logback.argument.StructuredArguments.v;
+
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,8 @@ import org.springframework.web.servlet.HandlerMapping;
 
 import com.opendatahub.timeseries.bdp.dto.dto.ExceptionDto;
 
-import static net.logstash.logback.argument.StructuredArguments.v;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Interceptor on each http request to log its name and performance stats

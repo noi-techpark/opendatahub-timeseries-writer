@@ -4,6 +4,8 @@
 
 package com.opendatahub.timeseries.bdp.writer.writer;
 
+import static net.logstash.logback.argument.StructuredArguments.v;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.actuate.health.Health;
@@ -11,8 +13,6 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 import com.opendatahub.timeseries.bdp.dto.utils.Utils;
-
-import static net.logstash.logback.argument.StructuredArguments.v;
 
 @Component
 public class CustomHealthIndicator implements HealthIndicator {

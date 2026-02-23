@@ -11,15 +11,18 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityManagerFactory;
-import jakarta.persistence.PersistenceUnit;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
+import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
+import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
+import com.opendatahub.timeseries.bdp.dto.dto.ProvenanceDto;
+import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
+import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
 import com.opendatahub.timeseries.bdp.writer.dal.Event;
 import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
@@ -27,14 +30,11 @@ import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.dal.TimeSeries;
 import com.opendatahub.timeseries.bdp.writer.dal.util.JPAException;
 import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
-import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
-import com.opendatahub.timeseries.bdp.dto.dto.ProvenanceDto;
-import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
-import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceUnit;
 
 /**
  * Writer API

@@ -16,10 +16,11 @@ import org.hibernate.annotations.Type;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 
+import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
+import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
+
 import io.hypersistence.utils.hibernate.type.range.PostgreSQLRangeType;
 import io.hypersistence.utils.hibernate.type.range.Range;
-import com.opendatahub.timeseries.bdp.writer.dal.util.QueryBuilder;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;

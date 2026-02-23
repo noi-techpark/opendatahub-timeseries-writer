@@ -4,12 +4,12 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal.util;
 
+import static net.logstash.logback.argument.StructuredArguments.v;
+
 import org.slf4j.Logger;
 
-import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 import com.opendatahub.timeseries.bdp.dto.utils.Utils;
-
-import static net.logstash.logback.argument.StructuredArguments.v;
+import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 
 public class Log {
 
