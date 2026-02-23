@@ -24,12 +24,12 @@ jobs:
 
   # Test
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout source code
         uses: actions/checkout@v2
       - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@v4
+        uses: fsfe/reuse-action@v6
 
       - name: Test code
         uses: noi-techpark/github-actions/maven-test@v2

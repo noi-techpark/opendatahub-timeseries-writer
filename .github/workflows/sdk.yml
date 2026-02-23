@@ -23,12 +23,12 @@ jobs:
 
   # Test
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout source code
         uses: actions/checkout@v2
       - name: REUSE Compliance Check
-        uses: fsfe/reuse-action@v4
+        uses: fsfe/reuse-action@v6
       - name: Test code
         uses: noi-techpark/github-actions/maven-test@v2
         with:
@@ -37,7 +37,7 @@ jobs:
 
   # Release Test Snapshot SDK
   release-sdk-snapshot:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
     needs: test
     concurrency: release-sdk-snapshot
@@ -79,7 +79,7 @@ jobs:
 
   # Release Production SDK
   release-sdk-prod:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/v')
     needs: test
     concurrency: release-sdk-prod
