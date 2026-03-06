@@ -583,7 +583,8 @@ public class TimeSeries {
 		public Series(EntityManager em, Provenance provenance, Station station, DataType type, Integer period, ValueTable table) {
 			this.provenance = provenance;
 			timeseries = new TimeSeries(station, type, period, table);
-			timeseries.setPartition(Partition.getDefault(em));
+			var part = PartitionDef.findPartition(em, station.getOrigin(), station.getStationtype(), type, period);
+			timeseries.setPartition(part != null ? part : Partition.getDefault(em));
 		}
 
 		private void updateNewest(RecordDtoImpl dto) {
