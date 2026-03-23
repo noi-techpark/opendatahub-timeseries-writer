@@ -4,7 +4,11 @@
 
 package com.opendatahub.timeseries.bdp.writer.dal;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
@@ -14,9 +18,13 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.hibernate.Session;
+import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
@@ -186,6 +194,21 @@ public class TimeSeries {
 				.setParameter("value_table", valueTable)
 				.setParameterIfNotNull("period", period, "and ts.period = :period")
 				.buildSingleResultOrNull(TimeSeries.class);
+	}
+
+	public static List<TimeSeries> findByStationsAndTypes(EntityManager em, Collection<Station> stations,
+			Collection<DataType> types) {
+		if (stations.isEmpty() || types.isEmpty()) {
+			return List.of();
+		}
+		return QueryBuilder
+				.init(em)
+				.addSql("SELECT ts FROM TimeSeries ts")
+				.addSql("WHERE ts.station IN :stations")
+				.addSql("AND ts.type IN :types")
+				.setParameter("stations", stations)
+				.setParameter("types", types)
+				.buildResultList(TimeSeries.class);
 	}
 
 	private static final Logger LOG = LoggerFactory.getLogger(TimeSeries.class);
@@ -408,6 +431,24 @@ public class TimeSeries {
 					)
 				));
 
+			LOG.debug("Loading timeseries");
+			// tree stationcode/type.cname/period/table
+			var timeseriesTree = TimeSeries.findByStationsAndTypes(em, stations.values(), types.values())
+				.stream()
+				.collect(Collectors.groupingBy(
+					ts -> ts.station.stationcode,
+					Collectors.groupingBy(
+						ts -> ts.getType().getCname(),
+						Collectors.groupingBy(
+							ts -> ts.getPeriod(),
+							Collectors.toMap(
+								ts -> ts.getValueTable(),
+								Function.identity()
+							)
+						)
+					)
+				));
+
 			var skippedDataTypes = new HashSet<String>();
 			int skippedCount = 0;
 			List<Series> allSeries = new ArrayList<>();
@@ -465,7 +506,17 @@ public class TimeSeries {
 							if (latest != null) {
 								series = new Series(provenance, latest);
 							} else {
-								series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
+								TimeSeries existingTs = Optional.ofNullable(timeseriesTree)
+										.map(m -> m.get(station.stationcode))
+										.map(m -> m.get(type.getCname()))
+										.map(m -> m.get(record.getPeriod()))
+										.map(m -> m.get(record.getTable()))
+										.orElse(null);
+								if (existingTs != null) {
+									series = new Series(provenance, existingTs);
+								} else {
+									series = new Series(em, provenance, station, type, record.getPeriod(), record.getTable());
+								}
 							}
 							if (record.getTable() != null) {
 								allSeries.add(series);
@@ -578,6 +629,11 @@ public class TimeSeries {
 			this.latest = latest;
 			newestTime = latest.getTimestamp().getTime();
 			newest = null;
+		}
+
+		public Series(Provenance provenance, TimeSeries timeseries) {
+			this.provenance = provenance;
+			this.timeseries = timeseries;
 		}
 
 		public Series(EntityManager em, Provenance provenance, Station station, DataType type, Integer period, ValueTable table) {
