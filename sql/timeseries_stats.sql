@@ -27,108 +27,141 @@ CREATE INDEX IF NOT EXISTS idx_timeseries_stats_timeseries
     ON intimev2.timeseries_stats (timeseries_id);
 
 -- ============================================================
--- refresh_timeseries_stats(batch_size)
+-- refresh_timeseries_stats(batch_size, avg_sample_size)
 --
 -- Call this on a schedule (e.g. daily via pg_cron).
 -- Each call processes up to `p_batch_size` timeseries —
 -- always the ones whose stats are oldest / missing first.
--- With 200 rows/day every timeseries is refreshed in at most
--- ceil(total_timeseries / 200) days, typically well under a week.
+--
+-- Performance strategy for deep/fragmented timeseries:
+--  - first_timestamp: LATERAL + LIMIT 1 ORDER BY ASC  → single index seek, O(log n)
+--  - last_timestamp:  direct join to measurement table → unique-index lookup, O(1)
+--  - record_count:    pg_class.reltuples of the partition table → O(1), approximate
+--  - avg_value_size:  LATERAL sample of p_avg_sample_size recent rows → bounded cost
 -- ============================================================
 CREATE OR REPLACE FUNCTION intimev2.refresh_timeseries_stats(
-    p_batch_size int DEFAULT 200
+    p_batch_size      int DEFAULT 200,
+    p_avg_sample_size int DEFAULT 500   -- rows sampled for avg_value_size
 )
 RETURNS int       -- number of timeseries actually processed
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_ts        RECORD;
-    v_first_ts  timestamp;
-    v_last_ts   timestamp;
-    v_count     int8;
-    v_avg_size  float8;
-    v_processed int := 0;
+    v_processed int;
 BEGIN
-    FOR v_ts IN
-        -- Pick the batch that needs the most urgent refresh.
-        -- Rows with no stats entry sort first (epoch fallback).
-        SELECT t.id, t.value_table
-        FROM   intimev2.timeseries t
-        LEFT JOIN intimev2.timeseries_stats s ON s.timeseries_id = t.id
-        WHERE  s.timeseries_id IS NULL
-            OR s.stats_updated_at < now() - INTERVAL '7 days'
-        ORDER  BY COALESCE(s.stats_updated_at, '1970-01-01'::timestamp) ASC
-        LIMIT  p_batch_size
-    LOOP
-        v_first_ts := NULL;
-        v_last_ts  := NULL;
-        v_count    := 0;
-        v_avg_size := NULL;
+    -- Materialise the stale batch once; referenced three times below.
+    -- partition_id is included so joins on history tables carry the
+    -- partition key, enabling Postgres to prune to a single partition.
+    CREATE TEMP TABLE _ts_batch ON COMMIT DROP AS
+    SELECT t.id AS timeseries_id, t.value_table, t.partition_id
+    FROM   intimev2.timeseries t
+    LEFT JOIN intimev2.timeseries_stats s ON s.timeseries_id = t.id
+    WHERE  s.timeseries_id IS NULL
+        OR s.stats_updated_at < now() - INTERVAL '7 days'
+    ORDER  BY COALESCE(s.stats_updated_at, '1970-01-01'::timestamp) ASC
+    LIMIT  p_batch_size;
 
-        -- Each branch uses the existing (timeseries_id, timestamp) index,
-        -- so MIN/COUNT are an index-only scan on the relevant partition.
-        CASE v_ts.value_table
+    INSERT INTO intimev2.timeseries_stats
+        (timeseries_id, first_timestamp, last_timestamp,
+         record_count, avg_value_size, stats_updated_at)
 
-            WHEN 'measurement' THEN
-                SELECT MIN(h.timestamp), COUNT(*)
-                INTO   v_first_ts, v_count
-                FROM   intimev2.measurementhistory h
-                WHERE  h.timeseries_id = v_ts.id;
+    -- doubles
+    SELECT
+        b.timeseries_id,
+        first_h.ts                                                AS first_timestamp,
+        m.timestamp                                               AS last_timestamp,
+        (SELECT reltuples::int8 FROM pg_class
+          WHERE oid = ('intimev2.measurementhistory_' || b.partition_id)::regclass) AS record_count,
+        NULL::float8                                              AS avg_value_size,
+        now()
+    FROM _ts_batch b
+    JOIN intimev2.measurement m ON m.timeseries_id = b.timeseries_id
+    JOIN LATERAL (
+        SELECT h.timestamp AS ts
+        FROM   intimev2.measurementhistory h
+        WHERE  h.timeseries_id = b.timeseries_id
+          AND  h.partition_id  = b.partition_id
+        ORDER  BY h.timestamp ASC
+        LIMIT  1
+    ) first_h ON true
+    WHERE b.value_table = 'measurement'
 
-                SELECT m.timestamp
-                INTO   v_last_ts
-                FROM   intimev2.measurement m
-                WHERE  m.timeseries_id = v_ts.id;
+    UNION ALL
 
-            WHEN 'measurementstring' THEN
-                SELECT MIN(h.timestamp), COUNT(*), AVG(length(h.string_value))
-                INTO   v_first_ts, v_count, v_avg_size
-                FROM   intimev2.measurementstringhistory h
-                WHERE  h.timeseries_id = v_ts.id;
+    -- strings
+    SELECT
+        b.timeseries_id,
+        first_h.ts,
+        m.timestamp,
+        (SELECT reltuples::int8 FROM pg_class
+          WHERE oid = ('intimev2.measurementstringhistory_' || b.partition_id)::regclass),
+        avg_s.avg_size,
+        now()
+    FROM _ts_batch b
+    JOIN intimev2.measurementstring m ON m.timeseries_id = b.timeseries_id
+    JOIN LATERAL (
+        SELECT h.timestamp AS ts
+        FROM   intimev2.measurementstringhistory h
+        WHERE  h.timeseries_id = b.timeseries_id
+          AND  h.partition_id  = b.partition_id
+        ORDER  BY h.timestamp ASC
+        LIMIT  1
+    ) first_h ON true
+    JOIN LATERAL (
+        SELECT AVG(length(h.string_value)) AS avg_size
+        FROM (
+            SELECT h.string_value
+            FROM   intimev2.measurementstringhistory h
+            WHERE  h.timeseries_id = b.timeseries_id
+              AND  h.partition_id  = b.partition_id
+            ORDER  BY h.timestamp DESC
+            LIMIT  p_avg_sample_size
+        ) h
+    ) avg_s ON true
+    WHERE b.value_table = 'measurementstring'
 
-                SELECT m.timestamp
-                INTO   v_last_ts
-                FROM   intimev2.measurementstring m
-                WHERE  m.timeseries_id = v_ts.id;
+    UNION ALL
 
-            WHEN 'measurementjson' THEN
-                SELECT MIN(h.timestamp), COUNT(*), AVG(pg_column_size(h.json_value))
-                INTO   v_first_ts, v_count, v_avg_size
-                FROM   intimev2.measurementjsonhistory h
-                WHERE  h.timeseries_id = v_ts.id;
+    -- json
+    SELECT
+        b.timeseries_id,
+        first_h.ts,
+        m.timestamp,
+        (SELECT reltuples::int8 FROM pg_class
+          WHERE oid = ('intimev2.measurementjsonhistory_' || b.partition_id)::regclass),
+        avg_s.avg_size,
+        now()
+    FROM _ts_batch b
+    JOIN intimev2.measurementjson m ON m.timeseries_id = b.timeseries_id
+    JOIN LATERAL (
+        SELECT h.timestamp AS ts
+        FROM   intimev2.measurementjsonhistory h
+        WHERE  h.timeseries_id = b.timeseries_id
+          AND  h.partition_id  = b.partition_id
+        ORDER  BY h.timestamp ASC
+        LIMIT  1
+    ) first_h ON true
+    JOIN LATERAL (
+        SELECT AVG(pg_column_size(h.json_value)) AS avg_size
+        FROM (
+            SELECT h.json_value
+            FROM   intimev2.measurementjsonhistory h
+            WHERE  h.timeseries_id = b.timeseries_id
+              AND  h.partition_id  = b.partition_id
+            ORDER  BY h.timestamp DESC
+            LIMIT  p_avg_sample_size
+        ) h
+    ) avg_s ON true
+    WHERE b.value_table = 'measurementjson'
 
-                SELECT m.timestamp
-                INTO   v_last_ts
-                FROM   intimev2.measurementjson m
-                WHERE  m.timeseries_id = v_ts.id;
+    ON CONFLICT (timeseries_id) DO UPDATE SET
+        first_timestamp  = EXCLUDED.first_timestamp,
+        last_timestamp   = EXCLUDED.last_timestamp,
+        record_count     = EXCLUDED.record_count,
+        avg_value_size   = EXCLUDED.avg_value_size,
+        stats_updated_at = EXCLUDED.stats_updated_at;
 
-            ELSE
-                -- Unknown value_table: skip silently, will retry next cycle
-                CONTINUE;
-
-        END CASE;
-
-        -- If history is empty but there is a current measurement, use it as first
-        IF v_first_ts IS NULL THEN
-            v_first_ts := v_last_ts;
-        END IF;
-
-        INSERT INTO intimev2.timeseries_stats
-            (timeseries_id, first_timestamp, last_timestamp,
-             record_count, avg_value_size, stats_updated_at)
-        VALUES
-            (v_ts.id, v_first_ts, v_last_ts,
-             v_count, v_avg_size, now())
-        ON CONFLICT (timeseries_id) DO UPDATE SET
-            first_timestamp  = EXCLUDED.first_timestamp,
-            last_timestamp   = EXCLUDED.last_timestamp,
-            record_count     = EXCLUDED.record_count,
-            avg_value_size   = EXCLUDED.avg_value_size,
-            stats_updated_at = EXCLUDED.stats_updated_at;
-
-        v_processed := v_processed + 1;
-    END LOOP;
-
+    GET DIAGNOSTICS v_processed = ROW_COUNT;
     RETURN v_processed;
 END;
 $$;
@@ -145,7 +178,7 @@ $$;
 --   SELECT cron.schedule(
 --       'refresh-timeseries-stats',   -- job name (unique)
 --       '0 3 * * *',                  -- daily at 03:00
---       $$SELECT intimev2.refresh_timeseries_stats(200)$$
+--       $$SELECT intimev2.refresh_timeseries_stats(200, 500)$$
 --   );
 --
 -- Useful management queries:
