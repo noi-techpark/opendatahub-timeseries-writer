@@ -4,55 +4,17 @@ SPDX-FileCopyrightText: NOI Techpark <digital@noi.bz.it>
 SPDX-License-Identifier: CC0-1.0
 -->
 
-# Big Data Platform
+# Opendatahub Timeseries Writer
 
 [![REUSE Compliance](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/reuse.yml/badge.svg)](https://github.com/noi-techpark/opendatahub-docs/wiki/REUSE)
 [![CI](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml/badge.svg)](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml)
 
-The Big Data Platform is part of the [Open Data Hub](http://opendatahub.com/)
-project. It collects and exposes data sets of various domains.
-
-This platform collects heterogeneous data of different sources and different
-domains, does elaborations on it and serves the raw and elaborated data through
-a REST interface.
+The Open Data Hub Timeseries writer (formerly known as "Big Data Platform" or BDP) is part of the [Open Data Hub](http://opendatahub.com/)
+project.  
+It serves as the main API to write various timeseries data into a uniform data model, which can be accessed via the [Timeseries API](https://github.com/noi-techpark/opendatahub-timeseries-api)
 
 For a detailed introduction, see our [Big Data Platform
 Introduction](https://opendatahub.readthedocs.io/en/latest/intro.html).
-
-----
-
-**Table of Contents**
-
-- [Big Data Platform](#big-data-platform)
-  - [Inbound API (writer)](#inbound-api-writer)
-    - [Getting started with Docker](#getting-started-with-docker)
-    - [Getting started natively](#getting-started-natively)
-    - [Authentication](#authentication)
-    - [DAL](#dal)
-      - [Configuration of the database connection](#configuration-of-the-database-connection)
-      - [Entities](#entities)
-    - [DTO](#dto)
-      - [StationDto](#stationdto)
-      - [DataTypeDto](#datatypedto)
-      - [SimpleRecordDto](#simplerecorddto)
-    - [client](#client)
-  - [Flight rules](#flight-rules)
-    - [I want to generate a new schema dump out of Hibernate's Entity classes](#i-want-to-generate-a-new-schema-dump-out-of-hibernates-entity-classes)
-    - [I want to update license headers of each source file](#i-want-to-update-license-headers-of-each-source-file)
-    - [I want to see details of this project as HTML page](#i-want-to-see-details-of-this-project-as-html-page)
-    - [I want to use client in my Java Maven project](#i-want-to-use-client-in-my-java-maven-project)
-    - [I want to publish a new client sdk on our maven repository](#i-want-to-publish-a-new-client-sdk-on-our-maven-repository)
-      - [Automatically via Github Actions](#automatically-via-github-actions)
-      - [Manually from your machine](#manually-from-your-machine)
-    - [I want to get started with a new data-collector](#i-want-to-get-started-with-a-new-data-collector)
-  - [Information](#information)
-    - [Support](#support)
-    - [Contributing](#contributing)
-    - [Documentation](#documentation)
-    - [License](#license)
-    - [REUSE](#reuse)
-
-----
 
 ## Inbound API (writer)
 
@@ -66,7 +28,7 @@ used by the `writer` and `client` to exchange data in a standardized
 format.
 
 The **OUTBOUND** API is called
-[Ninja](https://github.com/noi-techpark/opendatahub-timeseries-api).
+[Timeseries API](https://github.com/noi-techpark/opendatahub-timeseries-api).
 
 The writer is a REST API, which takes JSON DTOs, deserializes and validates them
 and finally stores them in the database. Additionally, it sets stations to
@@ -230,11 +192,6 @@ Default can be found at:
 Please note, values inside the `application.properties` file, overwrite values
 inside `persistence.xml`.
 
-We use a [schema-generator](infrastructure/utils/schema-generator/README.md) to
-generate the schema for the database. After that you can manually check what the
-difference between that schema and the old one is and provide a new flyway
-script inside `writer/src/main/resources/db/migration`.
-
 Hibernate, our object-relational-mapping (ORM) framework, handles the schema
 validation only (for security reasons). Usually, we set the value
 `hibernate.hbm2ddl.auto = validate` during development and
@@ -288,7 +245,7 @@ traceability between collectors and inserted data, to identify data for
 cleansing or bug fixes.
 
 *Example*:
-> We measure on `Fri Dec 16 2016 10:47:33` a data type `temperature` (see data
+> We measure on `Fri Dec 16 2025 10:47:33` a data type `temperature` (see data
 > type example) of `20.4` for a meteo station called `89935GW` (see station
 > example).
 
@@ -331,9 +288,14 @@ Describes a specific type of data. We define the structure inside
 Describes the measured value. We define the structure inside
 [SimpleRecordDto.java](dto/src/main/java/com/opendatahub/timeseries/bdp/dto/dto/SimpleRecordDto.java)
 
-### client
-The client contains the API through which components can communicate with
-the BDP writer. Just include the `client` [maven
+### client (deprecated)
+The client is a Java sdk to communicate with the BDP writer.  
+
+> [!WARNING]
+> Since we are implementing all transformers and elaborations in golang (or python), this client library is considered deprecated.  
+You can find the Golang SDK [here](https://github.com/noi-techpark/opendatahub-go-sdk/bdplib), with the module `bdplib` being the client library for this API.
+
+Just include the `client` [maven
 dependency](#i-want-to-use-client-in-my-java-maven-project)
 in your project and use the existing [JSON client
 implementation](client/src/main/java/com/opendatahub/timeseries/bdp/json/JSONPusher.java).
@@ -345,8 +307,7 @@ implementation.
 
 **`Object getDateOfLastRecord(String stationCode,String dataType,Integer period)`**
 
-This method is required to get the date of the last valid record
-
+This method gets the date of the last valid record
 
 **`Object syncStations(List<StationDto> data)`**
 
@@ -383,27 +344,58 @@ structure, see the
 [DataMapDto.java](dto/src/main/java/com/opendatahub/timeseries/bdp/dto/dto/DataMapDto.java)
 source.
 
+#### Database Partitioning
+To manage large data volumes, the API supports table partitioning of the history tables.  
+Partitioning is done on the `timeseries` level using `timeseries.partition_id` as key.  
+
+By default only one partition (with ID 1) exists and all new timeseries are put there.  
+
+The table `Partition` represents a partition with some additional descriptions
+
+At time of writing the process is not yet automated.  
+See [create_partition.sql] for an example of how to create partitions and move existing data
+
+##### Designing the partitioning scheme
+The partitions should be designed in a way to reflect query or delete/update patterns.  
+E.g. to group data that is requested together (such as all timeseries of a stationtype+origin), or an elaborated data type that has to be deleted often.
+
+It is possible to further sub-partition partitions, e.g. if you have a large partition of traffic data, you can sub-partition by timestamp date ranges
+
+##### Creating a new partition
+To use additional partitions, first create a record in the table `partition` and the corresponding partition of the `measurement*history` table, using the id of the `partition` record as partition key.
+
+e.g. 
+```sql
+CREATE TABLE IF NOT EXISTS measurementhistory_2 PARTITION OF measurementhistory FOR VALUES IN (2)
+```
+
+##### Define partition rules
+Rules on which timeseries goes into which partition are declared in `partition_def`.  
+
+Currently, you can decide to assign a partition by using `origin`, `stationtype`, `type_id` and `period` as criteria.
+
+The matching of a timeseries to a partition is done by specificity:  
+Whichever partition matches the highest number of these fields (with `null` being ignored) will be selected.  
+
+The code for this can be found in [PartitionDef.java](writer/src/main/java/com/opendatahub/timeseries/bdp/writer/dal/PartitionDef.java)
+
+Note that the rules only apply to newly created `timeseries` records and don't affect existing ones.  
+If you want a certain dataset to be in one partition, you have to migrate existing records manually.  
+
+##### Migrating existing timeseries
+You can migrate existing data to this partition by updating the `partition_id` of both the `timeseries` and `measurement*history` records to the target partition id.  
+
+Note that this process can be quite slow, due to updating the indexes, WAL, transactionality etc. and you will likely have to batch it in some way.
+
+Since new data is written to whatever partition is referenced on `timeseries`, it's a good idea to first update timeseries, commit, and then do the records. This way you ensure consistency between the timeseries and history.  
+If the two are not aligned, the outbound API might not be able to find the history records.  
+Be aware that this also applies to the time window between updating `timeseries` and the history.  
+
+At any rate it is good practice to ensure consistency via checks and align possible orphan measurements with their parent timeseries.  
+
 ## Flight rules
 
-### I want to generate a new schema dump out of Hibernate's Entity classes
-
-See [README.md](infrastructure/utils/schema-generator/README.md) inside
-`/infrastructure/utils/schema-generator`.
-
-### I want to update license headers of each source file
-To update license headers in each source code file run `mvn license:format`. To
-configure the header template edit `LICENSE/templates/` files, and set the
-correct attributes inside each `pom.xml`. See the plugin
-[license-maven-plugin](http://code.mycila.com/license-maven-plugin/) homepage
-for details. Use the `quicklicense.sh` script to update all source code license
-headers at once.
-
-### I want to see details of this project as HTML page
-Run `mvn site` to create a HTML page with all details of this project. Results
-can be found under `<project>/target/site/`, entrypoint is as usual
-`index.html`.
-
-### I want to use client in my Java Maven project
+### I want to use client in my Java Maven project (deprecated)
 Include the following snippet in your `pom.xml` file:
 ```
 	<repositories>
@@ -427,7 +419,7 @@ You can also use a version-range, like `[7.3.0,8.0.0)`. Find the latest version
 in our [release channel](https://github.com/noi-techpark/opendatahub-timeseries-writer/releases) on
 GitHub.
 
-### I want to publish a new client sdk on our maven repository
+### I want to publish a new client sdk on our maven repository (deprecated)
 
 This chapter is for the NOI team only. It describes how to publish a new
 client manually or via the Github Action workflow on our maven repo.
@@ -481,11 +473,7 @@ Call `mvn --projects dto --projects client --also-make clean install deploy`
 
 ### I want to get started with a new data-collector
 
-Refer to the [Contributing chapter] and our [HelloWorld Example Data Collector] inside
-https://github.com/noi-techpark/opendatahub-bdp-collectors to start a new data collector.
-
-[Contributing chapter]: https://github.com/noi-techpark/opendatahub-bdp-collectors/blob/main/README.md#contributing
-[HelloWorld Example Project]: https://github.com/noi-techpark/opendatahub-bdp-collectors/tree/main/data-collectors/helloworld
+Refer to the [data collection monorepo](https://github.com/noi-techpark/opendatahub-collectors)
 
 ## Information
 
