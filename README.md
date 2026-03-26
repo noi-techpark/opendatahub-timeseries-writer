@@ -10,11 +10,43 @@ SPDX-License-Identifier: CC0-1.0
 [![CI](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml/badge.svg)](https://github.com/noi-techpark/opendatahub-timeseries-writer/actions/workflows/main.yml)
 
 The Open Data Hub Timeseries writer (formerly known as "Big Data Platform" or BDP) is part of the [Open Data Hub](http://opendatahub.com/)
-project.  
+project.
 It serves as the main API to write various timeseries data into a uniform data model, which can be accessed via the [Timeseries API](https://github.com/noi-techpark/opendatahub-timeseries-api)
 
 For a detailed introduction, see our [Big Data Platform
 Introduction](https://opendatahub.readthedocs.io/en/latest/intro.html).
+
+## Table of Contents
+
+- [Inbound API (writer)](#inbound-api-writer)
+  - [Getting started with Docker](#getting-started-with-docker)
+  - [Getting started natively](#getting-started-natively)
+  - [Authentication](#authentication)
+  - [DAL](#dal)
+    - [Configuration of the database connection](#configuration-of-the-database-connection)
+    - [Entities](#entities)
+  - [DTO](#dto)
+    - [StationDto](#stationdto)
+    - [DataTypeDto](#datatypedto)
+    - [SimpleRecordDto](#simplerecorddto)
+  - [client (deprecated)](#client-deprecated)
+    - [Database Partitioning](#database-partitioning)
+      - [Designing the partitioning scheme](#designing-the-partitioning-scheme)
+      - [Creating a new partition](#creating-a-new-partition)
+      - [Define partition rules](#define-partition-rules)
+      - [Migrating existing timeseries](#migrating-existing-timeseries)
+- [Flight rules](#flight-rules)
+  - [I want to use client in my Java Maven project (deprecated)](#i-want-to-use-client-in-my-java-maven-project-deprecated)
+  - [I want to publish a new client sdk on our maven repository (deprecated)](#i-want-to-publish-a-new-client-sdk-on-our-maven-repository-deprecated)
+    - [Automatically via Github Actions](#automatically-via-github-actions)
+    - [Manually from your machine](#manually-from-your-machine)
+  - [I want to get started with a new data-collector](#i-want-to-get-started-with-a-new-data-collector)
+- [Information](#information)
+  - [Support](#support)
+  - [Contributing](#contributing)
+  - [Documentation](#documentation)
+  - [License](#license)
+  - [REUSE](#reuse)
 
 ## Inbound API (writer)
 
