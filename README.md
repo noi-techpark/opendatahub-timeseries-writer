@@ -30,12 +30,12 @@ Introduction](https://opendatahub.readthedocs.io/en/latest/intro.html).
     - [DataTypeDto](#datatypedto)
     - [SimpleRecordDto](#simplerecorddto)
   - [client (deprecated)](#client-deprecated)
-    - [Database Partitioning](#database-partitioning)
-      - [Designing the partitioning scheme](#designing-the-partitioning-scheme)
-      - [Creating a new partition](#creating-a-new-partition)
-      - [Define partition rules](#define-partition-rules)
-      - [Migrating existing timeseries](#migrating-existing-timeseries)
 - [Flight rules](#flight-rules)
+  - [Database Partitioning](#database-partitioning)
+    - [Designing the partitioning scheme](#designing-the-partitioning-scheme)
+    - [Creating a new partition](#creating-a-new-partition)
+    - [Define partition rules](#define-partition-rules)
+    - [Migrating existing timeseries](#migrating-existing-timeseries)
   - [I want to use client in my Java Maven project (deprecated)](#i-want-to-use-client-in-my-java-maven-project-deprecated)
   - [I want to publish a new client sdk on our maven repository (deprecated)](#i-want-to-publish-a-new-client-sdk-on-our-maven-repository-deprecated)
     - [Automatically via Github Actions](#automatically-via-github-actions)
@@ -376,56 +376,56 @@ structure, see the
 [DataMapDto.java](dto/src/main/java/com/opendatahub/timeseries/bdp/dto/dto/DataMapDto.java)
 source.
 
-#### Database Partitioning
-To manage large data volumes, the API supports table partitioning of the history tables.  
-Partitioning is done on the `timeseries` level using `timeseries.partition_id` as key.  
+## Flight rules
 
-By default only one partition (with ID 1) exists and all new timeseries are put there.  
+### Database Partitioning
+To manage large data volumes, the API supports table partitioning of the history tables.
+Partitioning is done on the `timeseries` level using `timeseries.partition_id` as key.
+
+By default only one partition (with ID 1) exists and all new timeseries are put there.
 
 The table `Partition` represents a partition with some additional descriptions
 
-At time of writing the process is not yet automated.  
+At time of writing the process is not yet automated.
 See [create_partition.sql] for an example of how to create partitions and move existing data
 
-##### Designing the partitioning scheme
-The partitions should be designed in a way to reflect query or delete/update patterns.  
+#### Designing the partitioning scheme
+The partitions should be designed in a way to reflect query or delete/update patterns.
 E.g. to group data that is requested together (such as all timeseries of a stationtype+origin), or an elaborated data type that has to be deleted often.
 
 It is possible to further sub-partition partitions, e.g. if you have a large partition of traffic data, you can sub-partition by timestamp date ranges
 
-##### Creating a new partition
+#### Creating a new partition
 To use additional partitions, first create a record in the table `partition` and the corresponding partition of the `measurement*history` table, using the id of the `partition` record as partition key.
 
-e.g. 
+e.g.
 ```sql
 CREATE TABLE IF NOT EXISTS measurementhistory_2 PARTITION OF measurementhistory FOR VALUES IN (2)
 ```
 
-##### Define partition rules
-Rules on which timeseries goes into which partition are declared in `partition_def`.  
+#### Define partition rules
+Rules on which timeseries goes into which partition are declared in `partition_def`.
 
 Currently, you can decide to assign a partition by using `origin`, `stationtype`, `type_id` and `period` as criteria.
 
-The matching of a timeseries to a partition is done by specificity:  
-Whichever partition matches the highest number of these fields (with `null` being ignored) will be selected.  
+The matching of a timeseries to a partition is done by specificity:
+Whichever partition matches the highest number of these fields (with `null` being ignored) will be selected.
 
 The code for this can be found in [PartitionDef.java](writer/src/main/java/com/opendatahub/timeseries/bdp/writer/dal/PartitionDef.java)
 
-Note that the rules only apply to newly created `timeseries` records and don't affect existing ones.  
-If you want a certain dataset to be in one partition, you have to migrate existing records manually.  
+Note that the rules only apply to newly created `timeseries` records and don't affect existing ones.
+If you want a certain dataset to be in one partition, you have to migrate existing records manually.
 
-##### Migrating existing timeseries
-You can migrate existing data to this partition by updating the `partition_id` of both the `timeseries` and `measurement*history` records to the target partition id.  
+#### Migrating existing timeseries
+You can migrate existing data to this partition by updating the `partition_id` of both the `timeseries` and `measurement*history` records to the target partition id.
 
 Note that this process can be quite slow, due to updating the indexes, WAL, transactionality etc. and you will likely have to batch it in some way.
 
-Since new data is written to whatever partition is referenced on `timeseries`, it's a good idea to first update timeseries, commit, and then do the records. This way you ensure consistency between the timeseries and history.  
-If the two are not aligned, the outbound API might not be able to find the history records.  
-Be aware that this also applies to the time window between updating `timeseries` and the history.  
+Since new data is written to whatever partition is referenced on `timeseries`, it's a good idea to first update timeseries, commit, and then do the records. This way you ensure consistency between the timeseries and history.
+If the two are not aligned, the outbound API might not be able to find the history records.
+Be aware that this also applies to the time window between updating `timeseries` and the history.
 
-At any rate it is good practice to ensure consistency via checks and align possible orphan measurements with their parent timeseries.  
-
-## Flight rules
+At any rate it is good practice to ensure consistency via checks and align possible orphan measurements with their parent timeseries.
 
 ### I want to use client in my Java Maven project (deprecated)
 Include the following snippet in your `pom.xml` file:
