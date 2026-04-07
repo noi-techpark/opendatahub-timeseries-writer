@@ -92,7 +92,7 @@ SPDX-License-Identifier: CC0-1.0
 					<execution>
 						<id>attach-sources</id>
 						<goals>
-							<goal>jar</goal>
+							<goal>jar-no-fork</goal>
 						</goals>
 					</execution>
 				</executions>
