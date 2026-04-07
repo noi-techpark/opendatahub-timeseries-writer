@@ -74,7 +74,7 @@ jobs:
             </settings>
         run: echo "$SETTINGS_XML" > ~/.m2/settings.xml
       - name: Deploy the SDK to our maven repo
-        run: mvn -B -DskipTests --projects dto --projects client --also-make install deploy
+        run: mvn -B -DskipTests --projects dto --projects client --also-make deploy
 
 
   # Release Production SDK
@@ -113,4 +113,4 @@ jobs:
             </settings>
         run: echo "$SETTINGS_XML" > ~/.m2/settings.xml
       - name: Deploy the SDK to our maven repo
-        run: mvn -B -DskipTests --projects dto --projects client --also-make install deploy
+        run: mvn -B -DskipTests --projects dto --projects client --also-make deploy
