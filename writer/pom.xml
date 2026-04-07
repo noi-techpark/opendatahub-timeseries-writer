@@ -24,7 +24,7 @@ SPDX-License-Identifier: CC0-1.0
 	<properties>
 		<finalName>writer</finalName>
 		<geotools.version>30.0</geotools.version>
-		<hibernate.version>6.6.4.Final</hibernate.version>
+		<hibernate.version>6.6.47.Final</hibernate.version>
 	</properties>
 
 	<dependencyManagement>
@@ -103,6 +103,10 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
 		</dependency>
 
 		<!-- Hibernate: ORM with spatial entity support (Postgis, Geometry, ...) -->
