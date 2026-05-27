@@ -14,6 +14,7 @@ DECLARE
   {"name": "traffic", "origin": null, "station_types": ["TrafficSensor", "TrafficDirection"]},
   {"name": "parking", "origin": null, "station_types": ["ParkingStation", "ParkingSensor", "ParkingFacility"]},
   {"name": "sharedmobility", "origin": "sharedmobility-ch", "station_types": null},
+  {"name": "emobility-ch", "origin": "BFE", "station_types": ["EChargingStation","EChargingPlug"]},
   {"name": "alpsgo", "origin": "AlpsGo", "station_types": null},
   {"name": "ummadum", "origin": "UMMADUM", "station_types": null},
   {"name": "echarging", "origin": null, "station_types": ["EChargingStation", "EChargingPlug"]},
@@ -92,11 +93,18 @@ BEGIN
     RAISE NOTICE 'TIME: %', now();
     
     -- migrate one timeseries at a time
-    FOR v_ts_record IN SELECT ts.id, value_table from timeseries ts
-      JOIN station s on s.id = ts.station_id
-      WHERE (v_origin IS NULL OR s.origin = v_origin)
-        AND (v_station_types IS NULL OR s.stationtype = ANY(v_station_types))
-        AND ts.partition_id != v_partition_id
+    FOR v_ts_record IN SELECT ts.id, value_table FROM timeseries ts
+      JOIN station s ON s.id = ts.station_id
+      WHERE ts.partition_id != v_partition_id
+        AND v_partition_id = (
+          SELECT pd.partition_id FROM partition_def pd
+          WHERE (pd.origin IS NULL OR pd.origin = s.origin)
+            AND (pd.stationtype IS NULL OR pd.stationtype = s.stationtype)
+          ORDER BY (CASE WHEN pd.origin = s.origin THEN 1 ELSE 0 END +
+                    CASE WHEN pd.stationtype = s.stationtype THEN 1 ELSE 0 END) DESC,
+                   pd.partition_id
+          LIMIT 1
+        )
     LOOP
       -- Update timeseries
       UPDATE timeseries ts
