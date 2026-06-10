@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "bdp-core.fullname" . }}
+  labels:
+    {{- include "bdp-core.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "bdp-core.selectorLabels" . | nindent 6 }}
