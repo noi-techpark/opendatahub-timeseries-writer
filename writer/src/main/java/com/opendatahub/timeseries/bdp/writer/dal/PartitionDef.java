@@ -84,6 +84,7 @@ public class PartitionDef {
 				SELECT s.partition
 				FROM scored s
 				WHERE s.score = (SELECT MAX(s2.score) FROM scored s2)
+				ORDER BY s.partition.id DESC
 				""";
 
 		List<Partition> results = em.createQuery(jpql, Partition.class)
@@ -91,14 +92,11 @@ public class PartitionDef {
 				.setParameter("stationType", stationType)
 				.setParameter("typeId", type.getId())
 				.setParameter("period", period)
+				.setMaxResults(1)
 				.getResultList();
 
 		if (results.isEmpty()) {
 			return null;
-		}
-
-		if (results.size() > 1) {
-			throw new IllegalStateException("Multiple partitions found with same match score");
 		}
 
 		return results.get(0);
