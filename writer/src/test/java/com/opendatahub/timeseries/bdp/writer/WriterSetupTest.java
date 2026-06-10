@@ -160,7 +160,6 @@ public abstract class WriterSetupTest extends AbstractJUnit4SpringContextTests {
             em.createQuery("DELETE FROM MeasurementJSONHistory").executeUpdate();
             em.createQuery("DELETE FROM TimeSeries").executeUpdate();
             em.createQuery("DELETE FROM PartitionDef").executeUpdate();
-            em.createQuery("DELETE FROM Event").executeUpdate();
             em.createQuery("UPDATE Station SET metaData = NULL").executeUpdate();
             em.createQuery("DELETE FROM MetaData").executeUpdate();
             em.createQuery("DELETE FROM Station").executeUpdate();
