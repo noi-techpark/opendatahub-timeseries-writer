@@ -10,7 +10,7 @@ SPDX-License-Identifier: CC0-1.0
 	<parent>
         <groupId>com.opendatahub.timeseries.bdp</groupId>
         <artifactId>core</artifactId>
-		<version>9.3.0</version>
+		<version>10.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -19,35 +19,29 @@ SPDX-License-Identifier: CC0-1.0
 	<artifactId>client</artifactId>
 	<description>Data Collector Interface for the Open Data Hub</description>
 
-	<properties>
-		<spring.security.version>6.1.4</spring.security.version>
-	</properties>
 
 	<dependencies>
 		<dependency>
 			<groupId>com.opendatahub.timeseries.bdp</groupId>
 			<artifactId>dto</artifactId>
-			<version>9.3.0</version>
+			<version>10.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>jakarta.servlet</groupId>
 			<artifactId>jakarta.servlet-api</artifactId>
-			<version>6.0.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-webflux</artifactId>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/io.projectreactor.netty/reactor-netty -->
 		<dependency>
 			<groupId>io.projectreactor.netty</groupId>
 			<artifactId>reactor-netty</artifactId>
-			<version>1.1.12</version>
 		</dependency>
 		<dependency>
-			<groupId>commons-configuration</groupId>
-			<artifactId>commons-configuration</artifactId>
-			<version>1.10</version>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-configuration2</artifactId>
+			<version>2.10.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.security</groupId>
@@ -74,7 +68,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.locationtech.jts</groupId>
 			<artifactId>jts-core</artifactId>
-			<version>1.18.2</version>
+			<version>1.20.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.locationtech.spatial4j</groupId>
@@ -84,18 +78,6 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>jakarta.annotation</groupId>
 			<artifactId>jakarta.annotation-api</artifactId>
-			<version>2.1.1</version>
 		</dependency>
 	</dependencies>
-	<dependencyManagement>
-		<dependencies>
-			<dependency>
-				<groupId>org.springframework.security</groupId>
-				<artifactId>spring-security-bom</artifactId>
-				<version>${spring.security.version}</version>
-				<type>pom</type>
-				<scope>import</scope>
-			</dependency>
-		</dependencies>
-	</dependencyManagement>
 </project>

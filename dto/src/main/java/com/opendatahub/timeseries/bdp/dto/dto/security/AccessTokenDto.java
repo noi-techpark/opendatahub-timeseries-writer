@@ -7,7 +7,6 @@ package com.opendatahub.timeseries.bdp.dto.dto.security;
 
 import java.io.Serializable;
 
-import io.swagger.annotations.ApiModelProperty;
 
 /**
  * access token dto which grants time limited access the the API
@@ -18,10 +17,8 @@ public class AccessTokenDto implements Serializable{
 
 	private static final long serialVersionUID = -698649583976751567L;
 
-	@ApiModelProperty (notes = "The token to be used in API calls needing authentication.")
 	private String token;
 
-	@ApiModelProperty (notes = "The limit of validity of the token.")
 	private Long expireDate;
 
 	public String getToken() {

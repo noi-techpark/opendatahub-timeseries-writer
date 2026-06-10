@@ -11,16 +11,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import io.swagger.annotations.ApiModelProperty;
 
 // @Deprecated This one is deprecated, but since we might change more than just this in the future, lets remove
 // this tag and reduce warnings for now!
 public class TypeDto implements Serializable {
 
 	private static final long serialVersionUID = -1224947780318447560L;
-	@ApiModelProperty (notes = "The unique ID of the type.")
 	private String id;
-	@ApiModelProperty (notes = "The unit of measurement of the type.")
 	private String unit;
 	private Map<String,String> desc = new HashMap<>();
 	private String typeOfMeasurement;

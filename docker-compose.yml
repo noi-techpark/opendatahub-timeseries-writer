@@ -4,7 +4,7 @@
 
 services:
   bdp:
-    image: maven:3-eclipse-temurin-17-alpine
+    image: maven:3-eclipse-temurin-21-alpine
     depends_on:
       - db
     env_file:

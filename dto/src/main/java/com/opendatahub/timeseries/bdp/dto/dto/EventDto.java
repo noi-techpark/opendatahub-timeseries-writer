@@ -24,7 +24,6 @@ import com.opendatahub.timeseries.bdp.dto.dto.utils.Constraints;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 
-import io.swagger.annotations.ApiModelProperty;
 
 /**
  * Data transfer object representing an event
@@ -36,7 +35,6 @@ public class EventDto implements Serializable {
 
 	private static final long serialVersionUID = 7928534360551629831L;
 
-	@ApiModelProperty (notes = "The unique UUID associated to the event.")
 	@JsonProperty(required = true)
 	@JsonPropertyDescription("Unique UUID describing a single event.")
 	protected String uuid;
@@ -45,22 +43,18 @@ public class EventDto implements Serializable {
 	@JsonProperty(required = true)
 	private String origin;
 
-	@ApiModelProperty (notes = "The event category")
 	@JsonProperty(required = true)
 	@JsonPropertyDescription("describes a group in which the event falls e.g. a car accident can be part of the category traffic jam ")
 	protected String category;
 
-	@ApiModelProperty (notes = "The event series UUID")
 	@JsonProperty(required = true)
 	@JsonPropertyDescription("concatenates equal events, that change over time")
 	protected String eventSeriesUuid;
 
-	@ApiModelProperty (notes = "The human-readable name associated to the event.")
 	@JsonProperty(required = true)
 	@JsonPropertyDescription("Unique name describing a single event inside the origin/category/event-series-id hierarchy.")
 	protected String name;
 
-	@ApiModelProperty (notes = "The event description")
 	@JsonProperty(required = false)
 	@JsonPropertyDescription("Describes the event in few words")
 	protected String description;
@@ -68,27 +62,22 @@ public class EventDto implements Serializable {
 	@JsonPropertyDescription("Meta data, describing additional features of the event")
 	private Map<String, Object> metaData = new HashMap<>();
 
-	@ApiModelProperty (notes = "The event location")
 	@JsonProperty(required = false)
 	@JsonPropertyDescription("A short text summarizing the location")
 	protected String locationDescription;
 
-	@ApiModelProperty (notes = "The geografic representation of the location using the projection EPSG:4326")
 	@JsonProperty(required = false)
 	@JsonPropertyDescription("Well-known Text representation of this Geometry(OpenGIS Simple Features Specification)")
 	private String wktGeometry;
 
-	@ApiModelProperty (notes = "The start time of the event (included, we have a half-open interval)")
 	@JsonProperty(required = false)
 	@JsonPropertyDescription("Start time as unix timestamp in milliseconds")
 	private Long eventStart;
 
-	@ApiModelProperty (notes = "The end time of the event (excluded, we have a half-open interval)")
 	@JsonProperty(required = false)
 	@JsonPropertyDescription("End time as unix timestamp in milliseconds (excluded)")
 	private Long eventEnd;
 
-	@ApiModelProperty (notes = "The data collector name and version that inserts this event")
 	@JsonProperty(required = true)
 	@JsonPropertyDescription("The UUID of a data collector name and version")
 	private String provenance;

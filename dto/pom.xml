@@ -11,7 +11,7 @@ SPDX-License-Identifier: GPL-3.0-only
 	<parent>
         <groupId>com.opendatahub.timeseries.bdp</groupId>
         <artifactId>core</artifactId>
-		<version>9.3.0</version>
+		<version>10.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -28,12 +28,6 @@ SPDX-License-Identifier: GPL-3.0-only
 			<version>4.3.0</version>
 		</dependency>
 
-		<!-- API Model Annotations in DTOs -->
-		<dependency>
-            <groupId>io.springfox</groupId>
-            <artifactId>springfox-swagger2</artifactId>
-            <version>3.0.0</version>
-        </dependency>
     </dependencies>
 
 </project>

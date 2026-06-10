@@ -12,7 +12,7 @@ SPDX-License-Identifier: CC0-1.0
 	<parent>
 		<groupId>com.opendatahub.timeseries.bdp</groupId>
 		<artifactId>core</artifactId>
-		<version>9.3.0</version>
+		<version>10.0.0</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
@@ -23,7 +23,7 @@ SPDX-License-Identifier: CC0-1.0
 
 	<properties>
 		<finalName>writer</finalName>
-		<geotools.version>30.0</geotools.version>
+		<geotools.version>32.0</geotools.version>
 		<hibernate.version>6.6.47.Final</hibernate.version>
 	</properties>
 
@@ -82,21 +82,21 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.keycloak</groupId>
 			<artifactId>keycloak-authz-client</artifactId>
-			<version>26.0.3</version>
+			<version>26.0.6</version>
 		</dependency>
 
 		<!-- To create JSON schema descriptions out of classes -->
 		<dependency>
 			<groupId>com.fasterxml.jackson.module</groupId>
 			<artifactId>jackson-module-jsonSchema</artifactId>
-			<version>2.15.3</version>
+			<version>2.17.2</version>
 		</dependency>
 
 		<!-- Data Transport Objects (see dto folder) -->
 		<dependency>
 			<groupId>com.opendatahub.timeseries.bdp</groupId>
 			<artifactId>dto</artifactId>
-			<version>9.3.0</version>
+			<version>10.0.0</version>
 		</dependency>
 
 		<!-- DB migration - Flyway -->
@@ -145,7 +145,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>io.hypersistence</groupId>
 			<artifactId>hypersistence-utils-hibernate-62</artifactId>
-			<version>3.6.0</version>
+			<version>3.9.0</version>
 		</dependency>
 
 		<!-- Hibernate: Connection pooling -->
@@ -175,7 +175,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-collections4</artifactId>
-			<version>4.4</version>
+			<version>4.5.0</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-beanutils</groupId>
@@ -186,7 +186,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-text</artifactId>
-			<version>1.10.0</version>
+			<version>1.12.0</version>
 		</dependency>
 		<!-- Container support for testing -->
 		<dependency>
@@ -197,7 +197,7 @@ SPDX-License-Identifier: CC0-1.0
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>1.20.0</version>
+			<version>1.21.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
