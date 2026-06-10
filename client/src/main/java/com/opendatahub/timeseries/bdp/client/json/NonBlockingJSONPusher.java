@@ -22,7 +22,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import com.opendatahub.timeseries.bdp.client.DataPusher;
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import com.opendatahub.timeseries.bdp.dto.dto.ProvenanceDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
@@ -50,7 +49,6 @@ public abstract class NonBlockingJSONPusher extends DataPusher {
     private static final String GET_DATE_OF_LAST_RECORD = "/getDateOfLastRecord/";
     private static final String STATIONS = "/stations/";
     private static final String PROVENANCE = "/provenance/";
-	private static final String EVENTS = "/event/";
 
 	private static final Logger LOG = LoggerFactory.getLogger(NonBlockingJSONPusher.class);
 
@@ -391,45 +389,6 @@ public abstract class NonBlockingJSONPusher extends DataPusher {
 			.block();
         return Arrays.asList(object);
     }
-
-	public Object addEvents(List<EventDto> dtos) {
-		LOG.info(
-			"NonBlockingJSONPusher/addEvents",
-			v("provenance", provenance)
-		);
-		if (dtos == null) {
-			LOG.warn("NonBlockingJSONPusher/addEvents: No events given. Returning!");
-			return null;
-		}
-		this.pushProvenance();
-		List<EventDto> eventsToSend = new ArrayList<>();
-		for (EventDto dto: dtos) {
-			dto.setProvenance(this.provenance.getUuid());
-			if (EventDto.isValid(dto, true)) {
-				eventsToSend.add(dto);
-			} else {
-				LOG.warn(
-					"NonBlockingJSONPusher/addEvents: The given event DTO is invalid. Skipping!",
-					v("eventDto", dto)
-				);
-			}
-		}
-		LOG.info(
-			"NonBlockingJSONPusher/addEvents: Pushing {} events to the writer",
-			eventsToSend.size()
-		);
-        return client
-			.post()
-			.uri(uriBuilder->uriBuilder
-				.path(EVENTS)
-				.queryParams(createParams())
-				.build()
-			)
-			.body(Mono.just(eventsToSend), Object.class)
-			.retrieve()
-			.bodyToMono(Object.class)
-			.block();
-	}
 
 	private MultiValueMap<String, String> createParams(Object... params) {
 		MultiValueMap<String, String> result = new LinkedMultiValueMap<>();

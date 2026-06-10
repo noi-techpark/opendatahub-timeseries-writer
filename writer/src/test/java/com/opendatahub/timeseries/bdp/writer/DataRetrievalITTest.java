@@ -12,17 +12,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import org.apache.commons.collections.map.SingletonMap;
 import org.junit.jupiter.api.Test;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +23,6 @@ import org.springframework.test.context.ContextConfiguration;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.SimpleRecordDto;
 import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
@@ -90,32 +82,6 @@ public class DataRetrievalITTest extends WriterSetupTest {
 		List<DataTypeDto> dtos = new ArrayList<DataTypeDto>();
 		dtos.add(t);
 		ResponseEntity<Object> result = dataManager.syncDataTypes(dtos, null);
-		assertEquals(HttpStatus.CREATED, result.getStatusCode());
-	}
-
-	@Test
-	public void testAddEvents() {
-		GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
-
-		EventDto t = new EventDto();
-		t.setUuid(UUID.randomUUID().toString());
-		t.setCategory("category");
-		t.setDescription("description");
-		t.setEventEnd(new Date().getTime());
-		t.setEventStart(new Date().getTime());
-		Coordinate coordinate = new Coordinate(45., 11.);
-		t.setWktGeometry(geometryFactory.createPoint(coordinate).toText());
-		t.setLocationDescription("Fake location");
-		Map<String, Object> metaData = new HashMap<>();
-		metaData.put("test", 5);
-		t.setMetaData(metaData);
-		t.setOrigin("origin");
-		t.setEventSeriesUuid(UUID.randomUUID().toString());
-		t.setName("some-event-name");
-		t.setProvenance("12345678");
-		List<EventDto> dtos = new ArrayList<>();
-		dtos.add(t);
-		ResponseEntity<Object> result = dataManager.addEvents(dtos, null);
 		assertEquals(HttpStatus.CREATED, result.getStatusCode());
 	}
 

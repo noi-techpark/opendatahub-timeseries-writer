@@ -24,7 +24,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import com.opendatahub.timeseries.bdp.dto.dto.ProvenanceDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
@@ -219,17 +218,6 @@ public class JsonController {
 		@RequestParam(value = "prv", required = false) String provenanceVersion
 	) {
 		return dataManager.syncDataTypes(data, getURIMapping("/types"));
-	}
-
-	@PostMapping(value = "/event")
-	@ResponseBody
-	public ResponseEntity<Object> syncEvents(
-		HttpServletRequest request,
-		@RequestBody(required = true) List<EventDto> eventDtos,
-		@RequestParam(value = "prn", required = false) String provenanceName,
-		@RequestParam(value = "prv", required = false) String provenanceVersion
-	) {
-		return dataManager.addEvents(eventDtos, getURIMapping("/events"));
 	}
 
 	private URI getURIMapping(String mapping, Object... uriVariableValues) {

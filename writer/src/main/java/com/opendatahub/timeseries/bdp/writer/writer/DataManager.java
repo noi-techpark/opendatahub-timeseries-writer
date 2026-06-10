@@ -19,12 +19,10 @@ import org.springframework.stereotype.Component;
 
 import com.opendatahub.timeseries.bdp.dto.dto.DataMapDto;
 import com.opendatahub.timeseries.bdp.dto.dto.DataTypeDto;
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import com.opendatahub.timeseries.bdp.dto.dto.ProvenanceDto;
 import com.opendatahub.timeseries.bdp.dto.dto.RecordDtoImpl;
 import com.opendatahub.timeseries.bdp.dto.dto.StationDto;
 import com.opendatahub.timeseries.bdp.writer.dal.DataType;
-import com.opendatahub.timeseries.bdp.writer.dal.Event;
 import com.opendatahub.timeseries.bdp.writer.dal.Provenance;
 import com.opendatahub.timeseries.bdp.writer.dal.Station;
 import com.opendatahub.timeseries.bdp.writer.dal.TimeSeries;
@@ -325,22 +323,6 @@ public class DataManager {
 			provenances.add(dto);
 		}
 		return provenances;
-	}
-
-	public ResponseEntity<Object> addEvents(List<EventDto> eventDtos, URI responseLocation) {
-		LOG.debug("DataManager: addEvents: {}, List<EventDto>.size = {}", responseLocation, eventDtos.size());
-		EntityManager entityManager = entityManagerFactory.createEntityManager();
-		try {
-			entityManager.getTransaction().begin();
-			Event.pushEvents(entityManager, eventDtos);
-			entityManager.getTransaction().commit();
-		} catch (Exception e) {
-			entityManager.getTransaction().rollback();
-			throw JPAException.unnest(e);
-		} finally {
-			entityManager.close();
-		}
-		return ResponseEntity.created(responseLocation).build();
 	}
 
 	@PostConstruct

@@ -8,12 +8,8 @@ package com.opendatahub.timeseries.bdp.writer.dal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-
 import org.junit.jupiter.api.Test;
 
-import com.opendatahub.timeseries.bdp.dto.dto.EventDto;
 import com.opendatahub.timeseries.bdp.writer.dal.util.PropertiesWithEnv;
 
 public class UtilityTest {
@@ -41,29 +37,4 @@ public class UtilityTest {
 		assertEquals("this-is-a-test", prop.getProperty("a.test"));
 	}
 
-	@Test
-	public void testRangeCasting() {
-		EventDto dto = new EventDto();
-		LocalDateTime startTime = LocalDateTime.of(2021, 5, 12, 4, 20);
-		LocalDateTime endTime = LocalDateTime.of(2021, 5, 12, 6, 20);
-		dto.setEventStart(
-				startTime.atZone(ZoneId.systemDefault()).toEpochSecond() * 1000);
-		dto.setEventEnd(
-				endTime.atZone(ZoneId.systemDefault()).toEpochSecond() * 1000);
-		assertEquals(
-				"[2021-05-12 04:20:00.000000,2021-05-12 06:20:00.000001)",
-				dto.getEventIntervalAsString());
-	}
-
-	@Test
-	public void testRangeCastingInfinity() {
-		EventDto dto = new EventDto();
-		LocalDateTime startTime = LocalDateTime.of(2021, 5, 12, 4, 20);
-		dto.setEventStart(
-				startTime.atZone(ZoneId.systemDefault()).toEpochSecond() * 1000);
-		dto.setEventEnd(null);
-		assertEquals(
-				"[2021-05-12 04:20:00.000000,)",
-				dto.getEventIntervalAsString());
-	}
 }

@@ -337,39 +337,6 @@ paths:
                     type: string
                     description: The URI mapping for the synchronized data types.
 
-  # ---
-
-  /event:
-    post:
-      tags:
-        - Events
-      summary: Add New Events
-      description: >
-        Adds a list of new events to the system. Each event is defined by an `EventDto` object. 
-        This endpoint allows for optional specification of provenance information.
-      parameters:
-        - $ref: "#/components/parameters/prn"
-        - $ref: "#/components/parameters/prv"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                $ref: "#/components/schemas/EventDto"
-      responses:
-        201:
-          description: Events successfully added. Returns the URI of the newly added events.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  uri:
-                    type: string
-                    description: The URI mapping for the added events.
-
 # -----------------------------------------------------------------------------
 
 # Writer Parameters -----------------------------------------------------------
@@ -682,60 +649,4 @@ components:
           additionalProperties: true
           description: Optional metadata associated with the data type.
 
-    # ---
-    EventDto:
-      type: object
-      description: Data transfer object representing an event.
-      required:
-        - uuid
-        - origin
-        - category
-        - eventSeriesUuid
-        - name
-        - provenance
-      properties:
-        uuid:
-          type: string
-          description: Unique UUID describing a single event.
-        origin:
-          type: string
-          description: Who provided the event?
-        category:
-          type: string
-          description: Describes a group in which the event falls.
-        eventSeriesUuid:
-          type: string
-          description: Concatenates equal events that change over time.
-        name:
-          type: string
-          description: Unique name describing a single event inside the origin/category/event-series-id hierarchy.
-        description:
-          type: string
-          description: Describes the event in few words.
-          nullable: true
-        metaData:
-          type: object
-          additionalProperties: true
-          description: Meta data, describing additional features of the event.
-        locationDescription:
-          type: string
-          description: A short text summarizing the location.
-          nullable: true
-        wktGeometry:
-          type: string
-          description: Text representation of this Geometry (OpenGIS Simple Features Specification).
-          nullable: true
-        eventStart:
-          type: integer
-          format: int64
-          description: The start time of the event as unix timestamp in milliseconds.
-          nullable: true
-        eventEnd:
-          type: integer
-          format: int64
-          description: The end time of the event as unix timestamp in milliseconds (excluded).
-          nullable: true
-        provenance:
-          type: string
-          description: The UUID of a data collector name and version.
 # -----------------------------------------------------------------------------

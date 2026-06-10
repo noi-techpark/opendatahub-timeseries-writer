@@ -13,14 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 public class DtoTest {
 
@@ -76,38 +71,4 @@ public class DtoTest {
 		assertEquals(1, stationMap.getBranch().size());
 	}
 
-	@Test
-	public void testEventDtoUuidGeneration() throws JsonProcessingException {
-		EventDto ev1 = new EventDto();
-		EventDto ev2 = new EventDto();
-
-		Map<String, Object> uuidMap1 = new HashMap<>();
-		uuidMap1.put("A", 1);
-		uuidMap1.put("B", "abc");
-		Map<String, Object> uuidMap2 = new HashMap<>();
-		uuidMap2.put("A", 1);
-		uuidMap2.put("B", "abc");
-
-		// Same with UUID namespace
-		ev1.setEventSeriesUuid(uuidMap1, UUID.fromString("8b1a7848-c436-44e5-9123-e221496a7769"));
-		ev2.setEventSeriesUuid(uuidMap2, UUID.fromString("8b1a7848-c436-44e5-9123-e221496a7769"));
-		assertEquals(true, ev1.getEventSeriesUuid().equals(ev2.getEventSeriesUuid()));
-
-		// Same without UUID namespace
-		ev1.setEventSeriesUuid(uuidMap1);
-		ev2.setEventSeriesUuid(uuidMap2);
-		assertEquals(true, ev1.getEventSeriesUuid().equals(ev2.getEventSeriesUuid()));
-
-		// Different, because the namespace is different
-		ev1.setEventSeriesUuid(uuidMap1, UUID.fromString("8b1a7848-c436-44e5-9123-e221496a7769"));
-		ev2.setEventSeriesUuid(uuidMap2, UUID.fromString("9b1a7848-c436-44e5-9123-e221496a7769"));
-		assertEquals(false, ev1.getEventSeriesUuid().equals(ev2.getEventSeriesUuid()));
-
-		// Different, because the maps are different
-		uuidMap2.put("C", "new");
-		ev1.setEventSeriesUuid(uuidMap1, UUID.fromString("8b1a7848-c436-44e5-9123-e221496a7769"));
-		ev2.setEventSeriesUuid(uuidMap2, UUID.fromString("8b1a7848-c436-44e5-9123-e221496a7769"));
-		assertEquals(false, ev1.getEventSeriesUuid().equals(ev2.getEventSeriesUuid()));
-
-	}
 }
