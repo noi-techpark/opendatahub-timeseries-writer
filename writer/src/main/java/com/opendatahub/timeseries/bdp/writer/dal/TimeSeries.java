@@ -452,7 +452,11 @@ public class TimeSeries {
 			var skippedDataTypes = new HashSet<String>();
 			int skippedCount = 0;
 			List<Series> allSeries = new ArrayList<>();
-			
+
+			// Shared creation timestamp for the whole batch, so that history and latest
+			// records written by the same API call are stamped consistently
+			Date createdOn = new Date();
+
 			LOG.debug("Loaded all stations, types, latest. Now walking tree");
 
 			for (var stationBranch : dataMap.getBranch().entrySet()) {
@@ -523,7 +527,7 @@ public class TimeSeries {
 							}
 						}
 
-						series.addHistory(record);
+						series.addHistory(record, createdOn);
 
 						if (series.skippedCount > 0) {
 							skippedDataTypes.add(type.getCname());
@@ -561,7 +565,7 @@ public class TimeSeries {
 			
 			LOG.debug("updating latest");
 			for (Series s : allSeries) {
-				s.updateLatest(em);
+				s.updateLatest(em, createdOn);
 			}
 			LOG.debug("committing");
 
@@ -578,25 +582,27 @@ public class TimeSeries {
 		}
 	}
 
-	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp) {
+	private MeasurementAbstractHistory newHistoryRecord(Object value, Date timestamp, Date createdOn) {
 		try {
 			MeasurementAbstractHistory rec = value_table.historyClass.getDeclaredConstructor().newInstance();
 			rec.setTimeseries(this);
 			rec.setPartition(partition);
 			rec.setValue(value);
 			rec.setTimestamp(timestamp);
+			rec.setCreated_on(createdOn);
 			return rec;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private MeasurementAbstract newLatestRecord(Object value, Date timestamp) {
+	private MeasurementAbstract newLatestRecord(Object value, Date timestamp, Date createdOn) {
 		try {
 			MeasurementAbstract rec = value_table.latestClass.getDeclaredConstructor().newInstance();
 			rec.setTimeseries(this);
 			rec.setValue(value);
 			rec.setTimestamp(timestamp);
+			rec.setCreated_on(createdOn);
 			return rec;
 		} catch (Exception e) {
 			throw new RuntimeException(e);
@@ -649,10 +655,10 @@ public class TimeSeries {
 				newestTime = newest.getTimestamp();
 			}
 		}
-		
+
 		private List<MeasurementAbstractHistory> measures = new ArrayList<>();
 
-		public void addHistory(SimpleRecordDto dto) throws Exception {
+		public void addHistory(SimpleRecordDto dto, Date createdOn) throws Exception {
 			// In case of duplicates within a single push, which one is written and which
 			// one is discarded, is undefined (depends on the record sorting above)
 			if (newestTime >= dto.getTimestamp()) {
@@ -667,27 +673,28 @@ public class TimeSeries {
 				skippedCount++;
 			} else {
 				MeasurementAbstractHistory rec = timeseries.newHistoryRecord(dto.getValue(),
-						new Date(dto.getTimestamp()));
+						new Date(dto.getTimestamp()), createdOn);
 				rec.setProvenance(provenance);
 				measures.add(rec);
 				updateNewest(dto);
 			}
 		}
-		
+
 		public List<MeasurementAbstractHistory> getMeasures(){
 			return measures;
 		}
 
-		private void updateLatest(EntityManager em) {
+		private void updateLatest(EntityManager em, Date createdOn) {
 			if (newest != null) {
 				if (latest == null) {
-					var measurement = timeseries.newLatestRecord(newest.getValue(), new Date(newest.getTimestamp()));
+					var measurement = timeseries.newLatestRecord(newest.getValue(), new Date(newest.getTimestamp()), createdOn);
 					measurement.setProvenance(provenance);
 					em.persist(measurement);
 				} else if (newest.getTimestamp() > latest.getTimestamp().getTime()) {
 					latest.setTimestamp(new Date(newest.getTimestamp()));
 					latest.setValue(newest.getValue());
 					latest.setProvenance(provenance);
+					latest.setCreated_on(createdOn);
 					em.merge(latest);
 				}
 			}
