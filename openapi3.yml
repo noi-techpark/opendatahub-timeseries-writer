@@ -305,6 +305,32 @@ paths:
 
   # ---
 
+  /reapStations/{stationType}/{origin}/{before}:
+    post:
+      tags:
+        - Stations
+      summary: Deactivate Stale Stations
+      description: >
+        Finds all stations of the given station type and origin and deactivates (sets `active = false`) those
+        whose latest measurement predates `before`. Stations with no measurements at all are left untouched
+        unless `ignoreNoData` is set to `false`.
+      parameters:
+        - $ref: "#/components/parameters/stationType"
+        - $ref: "#/components/parameters/origin_p"
+        - $ref: "#/components/parameters/before_p"
+        - $ref: "#/components/parameters/ignoreNoData"
+        - $ref: "#/components/parameters/prn"
+        - $ref: "#/components/parameters/prv"
+      responses:
+        200:
+          description: Stations successfully reaped. Returns the number of stations deactivated.
+          content:
+            application/json:
+              schema:
+                type: integer
+
+  # ---
+
   /syncDataTypes:
     post:
       tags:
@@ -370,6 +396,30 @@ components:
       description: The origin of the stations to synchronize
       schema:
         type: string
+
+    # ---
+
+    before_p:
+      name: before
+      in: path
+      required: true
+      description: Cutoff date-time (ISO 8601). Stations with no measurement at or after this date are deactivated.
+      schema:
+        type: string
+        format: date-time
+
+    # ---
+
+    ignoreNoData:
+      name: ignoreNoData
+      in: query
+      required: false
+      description: >
+        If true (default), stations that have no measurement at all are left untouched. If false, they are
+        deactivated as well, along with the stations whose latest measurement predates `before`.
+      schema:
+        type: boolean
+        default: true
 
     # ---
 

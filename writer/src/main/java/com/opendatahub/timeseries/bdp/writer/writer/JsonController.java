@@ -10,6 +10,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -207,6 +208,20 @@ public class JsonController {
 			provenanceVersion,
 			onlyActivation
 		);
+	}
+
+	@PostMapping(value = "/reapStations/{stationType}/{origin}/{before}")
+	@ResponseBody
+	public ResponseEntity<Object> reapStations(
+		HttpServletRequest request,
+		@PathVariable String stationType,
+		@PathVariable String origin,
+		@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date before,
+		@RequestParam(value = "prn", required = false) String provenanceName,
+		@RequestParam(value = "prv", required = false) String provenanceVersion,
+		@RequestParam(value = "ignoreNoData", required = false, defaultValue = "true") Boolean ignoreNoData
+	) {
+		return dataManager.reapStations(stationType, origin, before, ignoreNoData);
 	}
 
 	@PostMapping(value = "/syncDataTypes")

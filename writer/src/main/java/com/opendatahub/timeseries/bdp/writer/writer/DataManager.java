@@ -367,4 +367,38 @@ public class DataManager {
 		return ResponseEntity.created(uriMapping).build();
 	}
 
+	/**
+	 * Deactivates all stations of a given type and origin whose latest
+	 * measurement predates {@code before}.
+	 *
+	 * @param stationType   typology of a {@link Station}
+	 * @param origin        string identifier of the data collector from where data originates
+	 * @param before        cutoff date
+	 * @param ignoreNoData  if true (default), stations without any measurement at all are left untouched;
+	 *                      if false, they are deactivated as well
+	 * @return number of stations deactivated
+	 */
+	public ResponseEntity<Object> reapStations(String stationType, String origin, Date before, boolean ignoreNoData) {
+		if (isEmpty(stationType) || isEmpty(origin) || before == null) {
+			throw new JPAException(
+				"Invalid parameter value, either empty or null, which is not allowed",
+				HttpStatus.BAD_REQUEST.value()
+			);
+		}
+		LOG.debug("DataManager: reapStations: {}, {}, {}, ignoreNoData={}", stationType, origin, before, ignoreNoData);
+		EntityManager entityManager = entityManagerFactory.createEntityManager();
+		try {
+			entityManager.getTransaction().begin();
+			int deactivatedRecords = Station.reapStations(entityManager, stationType, origin, before, ignoreNoData);
+			entityManager.getTransaction().commit();
+			LOG.debug("DataManager: reapStations: {} stations deactivated", deactivatedRecords);
+			return ResponseEntity.ok(deactivatedRecords);
+		} catch (Exception e) {
+			entityManager.getTransaction().rollback();
+			throw JPAException.unnest(e);
+		} finally {
+			entityManager.close();
+		}
+	}
+
 }

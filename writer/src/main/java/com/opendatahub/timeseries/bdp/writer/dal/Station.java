@@ -9,6 +9,7 @@ import static net.logstash.logback.argument.StructuredArguments.v;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -682,6 +683,55 @@ public class Station {
 				.addSql("SELECT s FROM Station s WHERE s.stationcode = :stationcode")
 				.setParameter("stationcode", id)
 				.buildSingleResultOrNull(Station.class);
+	}
+
+	/**
+	 * Deactivates all stations of a given type and origin whose latest
+	 * measurement (across all value tables) predates {@code before}.
+	 *
+	 * @param em            entity manager
+	 * @param stationType   typology of a {@link Station}
+	 * @param origin        string identifier of the data collector from where data originates
+	 * @param before        cutoff date; stations with no measurement at or after this date are deactivated
+	 * @param ignoreNoData  if true (default), stations without any measurement at all are left untouched;
+	 *                      if false, they are deactivated as well
+	 * @return number of stations deactivated
+	 */
+	public static int reapStations(EntityManager em, String stationType, String origin, Date before, boolean ignoreNoData) {
+		return QueryBuilder
+			.init(em)
+			.nativeQuery()
+			.addSql("update {h-schema}station s set active = false")
+			.addSql("where s.id in (")
+			.addSql("  select s2.id from {h-schema}station s2")
+			.addSql("  left join lateral (")
+			.addSql("    select max(ts) as ts from (")
+			.addSql("      select max(m.timestamp) ts from {h-schema}measurement m")
+			.addSql("      join {h-schema}timeseries t on t.id = m.timeseries_id")
+			.addSql("      where t.station_id = s2.id")
+			.addSql("      union all")
+			.addSql("      select max(m.timestamp) from {h-schema}measurementjson m")
+			.addSql("      join {h-schema}timeseries t on t.id = m.timeseries_id")
+			.addSql("      where t.station_id = s2.id")
+			.addSql("      union all")
+			.addSql("      select max(m.timestamp) from {h-schema}measurementstring m")
+			.addSql("      join {h-schema}timeseries t on t.id = m.timeseries_id")
+			.addSql("      where t.station_id = s2.id")
+			.addSql("    ) x")
+			.addSql("  ) latest on true")
+			.addSql("  where s2.stationtype = :stationtype")
+			.addSql("  and s2.origin = :origin")
+			.addSql("  and (")
+			.addSql("    (latest.ts is not null and latest.ts < :before)")
+			.addSql("    or (latest.ts is null and not :ignoreNoData)")
+			.addSql("  )")
+			.addSql(")")
+			.setParameter("stationtype", stationType)
+			.setParameter("origin", origin)
+			.setParameter("before", before)
+			.setParameter("ignoreNoData", ignoreNoData)
+			.buildNative()
+			.executeUpdate();
 	}
 
 	/**

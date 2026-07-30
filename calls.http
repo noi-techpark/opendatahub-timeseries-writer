@@ -181,6 +181,14 @@ Authorization: Bearer {{authtoken}}
 ]
 
 
+### Reap stale stations (stations without any data are left untouched by default)
+POST {{host}}/json/reapStations/EChargingStation/ALPERIA/2026-01-01T00:00:00Z?prn=test&prv=11111
+Authorization: Bearer {{authtoken}}
+
+### Reap stale stations, also deactivating stations that never received any data
+POST {{host}}/json/reapStations/EChargingStation/ALPERIA/2026-01-01T00:00:00Z?prn=test&prv=11111&ignoreNoData=false
+Authorization: Bearer {{authtoken}}
+
 ### Push Records
 POST {{host}}/json/pushRecords/RWISstation
 Content-Type: application/json
