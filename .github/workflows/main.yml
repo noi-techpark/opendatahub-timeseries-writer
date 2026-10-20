@@ -89,6 +89,49 @@ jobs:
           aws-eks-cluster-name: aws-main-eu-01
           aws-region: eu-west-1
 
+  # Deploy Test on Scaleway (image is built and pushed by deploy-test)
+  deploy-test-scw:
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/main'
+    needs: deploy-test
+    environment: test
+    concurrency: deploy-test-scw
+    env:
+      SCW_ACCESS_KEY: ${{ secrets.SCW_DEV_ACCESS_KEY_ID }}
+      SCW_SECRET_KEY: ${{ secrets.SCW_DEV_ACCESS_KEY_SECRET }}
+      SCW_DEFAULT_REGION: fr-par
+      SCW_DEFAULT_ORGANIZATION_ID: d0d90a7d-5b86-4b8a-b271-36ecb405fb9d
+      SCW_DEFAULT_PROJECT_ID: af92482c-17f4-4d6c-b435-bb6695dde286
+      SCW_CLUSTER_ID: 144c40cb-6737-484e-be30-a2e8b8a49181
+      SCW_CLI_VERSION: '2.65.1'
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Install Scaleway CLI
+        run: |
+          curl -fsSL -o scw "https://github.com/scaleway/scaleway-cli/releases/download/v${SCW_CLI_VERSION}/scaleway-cli_${SCW_CLI_VERSION}_linux_amd64"
+          sudo install -m 0755 scw /usr/local/bin/scw
+
+      - name: Configure kubeconfig
+        run: scw k8s kubeconfig install "$SCW_CLUSTER_ID" region=fr-par
+
+      - name: Customize values.yaml
+        run: |
+          yq -i '
+            .image.repository="${{ env.DOCKER_IMAGE }}" |
+            .image.tag="${{ env.DOCKER_TAG }}" |
+            .image.pullPolicy="IfNotPresent"
+          ' infrastructure/helm/test.yaml
+
+      - name: Deploy on cluster
+        run: |
+          helm upgrade --install bdp-core infrastructure/helm/bdp-core \
+            --values infrastructure/helm/test.yaml \
+            --values infrastructure/helm/test-scw.yaml \
+            --namespace core \
+            --wait --timeout 5m
+
   # Deploy Prod
   deploy-prod:
     runs-on: ubuntu-24.04

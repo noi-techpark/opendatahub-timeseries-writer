@@ -1,0 +1,7 @@
+# Overlay on test.yaml for the Scaleway cluster
+ingress:
+  hosts:
+    - host: mobility.share.scw.opendatahub.testingmachine.eu
+      paths:
+        - path: "/"
+          pathType: Prefix
