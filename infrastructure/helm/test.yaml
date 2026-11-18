@@ -10,6 +10,8 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: 50m
 
 env:
+  # Temporary mitigation for CVE-2026-114938 (Java4Shell); remove once the JDK in the image includes the fix
+  JAVA_TOOL_OPTIONS: "-XX:-UseBASE64Intrinsics"
   SECURITY_ALLOWED_ORIGINS: "*"
   KEYCLOAK_URL: https://auth.opendatahub.testingmachine.eu/auth
   KEYCLOAK_SSL_REQUIRED: none
